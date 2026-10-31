@@ -177,11 +177,13 @@ static int capture_result(int *pieces, int *gpos, int c, int captured)
     return v < 0 ? WIN(1) : 0;
   }
 
-  int d = probe_dtz_makruk(pieces, gpos, c == 0);
-  if (d < 0) { // c loses in -d plies (even)
+  // probe WDL first: a mated position has D = 0 like a draw
+  int w = probe_table(pieces, gpos, c == 0);
+  int d = w ? probe_dtz_makruk(pieces, gpos, c == 0) : 0;
+  if (w < 0) { // c loses in -d plies (even, 0 if mated)
     int j = (-d) / 2 + 1;
     return j <= MAX_WIN ? j : 0;
-  } else if (d > 0) { // c wins in d plies (odd)
+  } else if (w > 0) { // c wins in d plies (odd)
     int j = (d + 1) / 2;
     return j <= MAX_LOSS ? -j - 1 : 0;
   }
@@ -672,13 +674,19 @@ static void sort_map(uint64_t *freq, uint16_t *map, uint16_t *inv_map,
   *num = n;
 }
 
+// Only one side to move is stored in the DTZ file (as in Syzygy). Both
+// sides are compressed and the smaller file is kept.
 static void write_dtz(uint8_t *buf)
 {
   uint8_t v[256];
-  struct tb_handle *G = create_tb(tablename, 0, 10);
+  char name[2][64];
+  uint64_t fsize[2] = { UINT64_MAX, UINT64_MAX };
 
   compress_alloc_dtz_u8();
   for (int s = 0; s < (split ? 2 : 1); s++) {
+    sprintf(name[s], "%s%s", tablename, split ? (s ? "_b" : "_w") : "");
+    struct tb_handle *G = create_tb(name[s], 0, 10);
+    G->split = 0;
     struct dtz_map *map = &dtz_maps[s];
     uint64_t freq[4][256];
     memset(map, 0, sizeof(*map));
@@ -720,8 +728,27 @@ static void write_dtz(uint8_t *buf)
     compress_init_dtz_u8(map);
     map_dc = dc;
     compress_side(G, buf, s, v, 0);
+    merge_tb(G);
+    if (split) {
+      char file[80];
+      sprintf(file, "%s%s", name[s], DTZSUFFIX);
+      FILE *F = fopen(file, "rb");
+      fseek(F, 0, SEEK_END);
+      fsize[s] = ftell(F);
+      fclose(F);
+    }
   }
-  merge_tb(G);
+  if (split) {
+    int keep = fsize[1] < fsize[0];
+    char from[80], to[80], other[80];
+    sprintf(from, "%s%s", name[keep], DTZSUFFIX);
+    sprintf(other, "%s%s", name[!keep], DTZSUFFIX);
+    sprintf(to, "%s%s", tablename, DTZSUFFIX);
+    printf("dtz: %ctm %"PRIu64" bytes, %ctm %"PRIu64" bytes, keeping %ctm\n",
+        'w', fsize[0], 'b', fsize[1], keep ? 'b' : 'w');
+    rename(from, to);
+    remove(other);
+  }
 }
 
 /* Main */

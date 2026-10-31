@@ -65,13 +65,25 @@ WDL value:
   "capture don't-cares", so no capture search is needed (and a capture
   search would give wrong results, because captures do not reset the
   count).
-* **DTZ file**: `D` for every non-drawn position, *for both sides to move*
-  (the file has two sub-tables, like a WDL file, unless the material is
-  symmetric). The symbol `s` read from the sub-table is mapped as in
-  Syzygy DTZ files (`v = map[0][s]` for wins and `v = map[1][s]` for
-  losses if flag bit 2 is set, otherwise `v = s`). Then `D = v + 1` for
-  wins and `D = v` for losses (so that mated positions can be stored with
-  `D = 0`).
+* **DTZ file**: `D` for every non-drawn position, for *one* side to move
+  (as in Syzygy: the generator compresses both sides and keeps the smaller
+  one; flag bit 0 of the sub-table gives the stored side). The symbol `s`
+  read from the sub-table is mapped as in Syzygy DTZ files
+  (`v = map[0][s]` for wins and `v = map[1][s]` for losses if flag bit 2
+  is set, otherwise `v = s`). Then `D = v + 1` for wins and `D = v` for
+  losses (so that mated positions can be stored with `D = 0`).
+* For the other side to move, `D` follows from a 1-ply search over all
+  legal moves. A non-capture leads to a position of the stored side. A
+  capture that leaves the opponent with a bare king counts as `D = 1` for
+  the capturing side if the resulting position is a WDL loss for the bare
+  king (a fresh count starts), otherwise as a draw. Any other capture
+  leads to a subtable, whose `D` is used as is (probed recursively, since
+  that may again need a search). A move into a position that the
+  opponent loses in `D'` wins in `D' + 1`, a move into a position that the
+  opponent wins in `D'` loses in `D' + 1`. A won position has the minimum
+  over its winning moves, a lost position the maximum over all its moves. Probe the child's WDL first: a mated child has `D = 0`, which
+  must not be mistaken for a draw. `probe_dtz_makruk()` in `src/probe.c`
+  is the reference implementation.
 
 Since the count at any reachable state is never more favourable than a
 fresh count, a WDL draw is always a draw, and `D` only matters for
@@ -174,9 +186,9 @@ Measured on 4 cores (Xeon, 2.8 GHz) with `run_makruk.py --stats`.
 | Pieces | Tables | RAM (peak) | CPU time | Disk |
 |--------|--------|------------|----------|------|
 | 3 | 5 | 22 MB | 0.3 s | 19 KB |
-| 4 | 30 | 220 MB | 5 min | 23 MB |
-| 5 | 110 | 2.0 GB | ≈ 14 h (est.) | ≈ 9 GB (est.) |
-| 6 | 365 | ≈ 120 GB (est.) | ≈ 3000 h (est.) | ≈ 2.5–3 TB (est.) |
+| 4 | 30 | 220 MB | 5.5 min | 12 MB |
+| 5 | 110 | 1.9 GB | ≈ 15 h (est.) | ≈ 4.5 GB (est.) |
+| 6 | 365 | ≈ 120 GB (est.) | ≈ 3300 h (est.) | ≈ 1.4 TB (est.) |
 
 3 and 4 pieces: all tables measured. 5 pieces: 11 tables measured and
 extrapolated per table class (28 pawnless without khon, 32 pawnless with
@@ -184,8 +196,8 @@ khon, 50 pawnful):
 
 | Class (5 pieces) | CPU per table | RAM | Disk per table |
 |------------------|---------------|-----|----------------|
-| pawnless, no khon (KRNvKM, KRNMvK, KRMvKR, KMMvKM) | 2.5–8 min | 1.6–1.8 GB | 1–52 MB |
-| pawnless, khon (KSMvKM, KRSvKN) | 10–13 min | 1.9–2.0 GB | 200–280 MB |
+| pawnless, no khon (KRNvKM, KRNMvK, KRMvKR, KMMvKM) | 2.5–15 min | 1.6–1.8 GB | 0.9–22 MB |
+| pawnless, khon (KSMvKM, KRSvKN) | 10–14 min | 1.8–1.9 GB | 104–138 MB |
 | pawnful (KSPvKM, KRPvKR, KMMvKP, KMPvKM, KMPvKP) | 5–9 min | 0.4–0.65 GB | 0.3–20 MB |
 
 6 pieces cannot be measured on this machine. Estimates: pawnless tables
@@ -193,7 +205,7 @@ need `3 · 2048 · 64^4` bytes ≈ 103 GB plus about 20% (measured ratio at 5
 pieces), pawnful tables about 16 GB with `-d` (as for chess). CPU time and
 file sizes grow by a factor of 64–100 per piece in the measurements from 4
 to 5 pieces; the disk estimate is dominated by the pawnless tables with a
-khon (≈ 24 GB each) and is uncertain by a factor of 2–3.
+khon (≈ 12 GB each) and is uncertain by a factor of 2–3.
 
 ## Limitations
 
@@ -201,8 +213,7 @@ khon (≈ 24 GB each) and is uncertain by a factor of 2–3.
   (two tables and one output buffer). The generator does not yet exploit
   the 8-fold symmetry internally, only in the files.
 * `D` behaves like a distance to mate, so pawnless DTZ files are much
-  larger than chess DTZ files (e.g. 51 MB for KRNvKM, 167 MB for KSMvKM).
+  larger than chess DTZ files (e.g. 22 MB for KRNvKM, 69 MB for KSMvKM).
   Tables with a khon only have the mirror symmetry and dominate the total
-  size. Storing DTZ for one side only (as Syzygy does, with a 1-ply search
-  when probing) would roughly halve the DTZ files.
+  size.
 * There is no `mtbver`; `tbcheck` verifies the embedded checksums.

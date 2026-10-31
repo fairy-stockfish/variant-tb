@@ -2630,7 +2630,8 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
 }
 
 #ifdef MAKRUK
-// Two-sided DTZ tables of Makruk pawnless tables (see MAKRUK.md).
+// DTZ tables of Makruk pawnless tables (see MAKRUK.md). Only one side to
+// move is stored; the flags of the sub-table say which one.
 static void mk_init_dtz(struct TBEntry_piece *ptr)
 {
   char name[256];
@@ -2700,10 +2701,93 @@ static void mk_init_dtz(struct TBEntry_piece *ptr)
     ptr->dtz_precomp[s]->data = data;
     data += size[3 * s + 2];
   }
+  ptr->dtz_side = ptr->dtz_flags[0] & 0x01;
+}
+
+// does a piece of colour c (0 white, 8 black) attack sq?
+static int mk_attacked(int *pieces, int *gpos, int sq, int c, bitboard occ)
+{
+  for (int i = 0; i < numpcs; i++) {
+    int t = pieces[i];
+    if (t && (t & 0x08) == c && (PieceRange(gpos[i], t, occ) & bit[sq]))
+      return 1;
+  }
+  return 0;
+}
+
+static int mk_num_pieces(int *pieces, int c)
+{
+  int n = 0;
+  for (int i = 0; i < numpcs; i++)
+    if (pieces[i] && (pieces[i] & 0x08) == c && (pieces[i] & 0x07) != KING)
+      n++;
+  return n;
+}
+
+// D for the side to move that is not stored in the DTZ file: search all
+// moves. Non-captures lead to positions of the stored side; captures lead
+// to subtables (with the count continuing), or leave the opponent with a
+// bare king, which starts a fresh pieces' honour count.
+static int mk_dtz_search(int *pieces, int *gpos, int wtm, int wdl)
+{
+  int us = wtm ? 0 : 8, them = us ^ 8;
+  int best = wdl > 0 ? INT32_MAX : 0;
+  int king = 0;
+  bitboard occ = 0, own = 0;
+
+  for (int i = 0; i < numpcs; i++)
+    if (pieces[i]) {
+      occ |= bit[gpos[i]];
+      if ((pieces[i] & 0x08) == us) {
+        own |= bit[gpos[i]];
+        if ((pieces[i] & 0x07) == KING) king = i;
+      }
+    }
+  int us_num = mk_num_pieces(pieces, us);
+  int them_num = mk_num_pieces(pieces, them);
+
+  for (int j = 0; j < numpcs; j++) {
+    int t = pieces[j];
+    if (!t || (t & 0x08) != us) continue;
+    int from = gpos[j];
+    bitboard bb = PieceRange(from, t, occ) & ~own;
+    while (bb) {
+      int to = FirstOne(bb);
+      ClearFirst(bb);
+      int m = -1;
+      if (occ & bit[to]) {
+        for (m = 0; m < numpcs; m++)
+          if (pieces[m] && gpos[m] == to) break;
+        if ((pieces[m] & 0x07) == KING) continue;
+      }
+      int cap = m >= 0 ? pieces[m] : 0;
+      bitboard occ2 = (occ & ~bit[from]) | bit[to];
+      if (m >= 0) pieces[m] = 0;
+      gpos[j] = to;
+      if (!mk_attacked(pieces, gpos, gpos[king], them, occ2)) {
+        int r; // result for us: > 0 win in r, < 0 loss in -r, 0 draw
+        if (m >= 0 && them_num == 1)
+          r = us_num > 0 && probe_table(pieces, gpos, !wtm) < 0 ? 1 : 0;
+        else {
+          // probe WDL first: a mated position has D = 0 like a draw
+          int w = probe_table(pieces, gpos, !wtm);
+          int d = w ? probe_dtz_makruk(pieces, gpos, !wtm) : 0;
+          r = w < 0 ? -d + 1 : w > 0 ? -(d + 1) : 0;
+        }
+        if (wdl > 0 && r > 0 && r < best) best = r;
+        if (wdl < 0 && r < 0 && -r > best) best = -r;
+      }
+      gpos[j] = from;
+      if (m >= 0) pieces[m] = cap;
+    }
+  }
+
+  return wdl > 0 ? best : -best;
 }
 
 // Returns the signed counting distance D (plies) of a pawnless position,
-// positive if the side to move wins, or 0 if it is drawn with a fresh count.
+// positive if the side to move wins, or 0 if it is drawn with a fresh count
+// or checkmated (use probe_table() to tell these apart).
 int probe_dtz_makruk(int *restrict pieces, int *restrict gpos, int wtm)
 {
   uint64_t key = 0ULL;
@@ -2744,16 +2828,19 @@ int probe_dtz_makruk(int *restrict pieces, int *restrict gpos, int wtm)
     bside = 0;
   }
 
-  uint8_t *pc = entry->dtz_pieces[bside];
+  if (bside != entry->dtz_side)
+    return mk_dtz_search(pieces, gpos, wtm, wdl);
+
+  uint8_t *pc = entry->dtz_pieces[0];
   for (i = 0, j = 0; i < entry->num; i++) {
     for (; pieces[j] != (pc[i] ^ cmirror); j++);
     pos[i] = gpos[j++];
     if (i < entry->num && pc[i] != pc[i + 1]) j = 0;
   }
   uint64_t idx = mk_probe_index(pos, pc, entry->num, mirror);
-  int v = decompress_pairs(entry->dtz_precomp[bside], idx);
-  if (entry->dtz_flags[bside] & 2)
-    v = entry->dtz_map[bside][wdl > 0 ? 0 : 1][v];
+  int v = decompress_pairs(entry->dtz_precomp[0], idx);
+  if (entry->dtz_flags[0] & 2)
+    v = entry->dtz_map[0][wdl > 0 ? 0 : 1][v];
   // wins are stored as D - 1, losses as D (so that mates can be stored)
   return wdl > 0 ? v + 1 : -v;
 }

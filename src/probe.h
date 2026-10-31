@@ -141,6 +141,7 @@ struct TBEntry_piece {
   char name[2 * TBPIECES + 4];
   uint8_t dtz_ready;
   uint8_t dtz_flags[2];
+  uint8_t dtz_side;         // side to move stored in the DTZ file
   uint8_t dtz_pieces[2][TBPIECES];
   struct PairsData *dtz_precomp[2];
   uint8_t *dtz_map[2][2];
