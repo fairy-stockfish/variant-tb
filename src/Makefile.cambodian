@@ -1,0 +1,6 @@
+PREFIX = cmtb
+DEPDIR = .depscm
+OBJDIR = objscm
+FLAGS += -DSHATRANJ -DMAKRUK -DCAMBODIAN
+
+include Makefile.mkfamily

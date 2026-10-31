@@ -17,6 +17,7 @@
 #include "defs.h"
 #include "probe.h"
 #include "util.h"
+#include "mkrules.h"
 
 #if defined(SUICIDE)
 // 5-piece:
@@ -2766,7 +2767,11 @@ static int mk_dtz_search(int *pieces, int *gpos, int wtm, int wdl)
       gpos[j] = to;
       if (!mk_attacked(pieces, gpos, gpos[king], them, occ2)) {
         int r; // result for us: > 0 win in r, < 0 loss in -r, 0 draw
-        if (m >= 0 && them_num == 1)
+        if (m >= 0 && MK_CAPTURE_RESETS(us_num > 0 && them_num > 0)) {
+          // fresh 50-move counter: a losing capture loses at once (D = 0)
+          int w = probe_table(pieces, gpos, !wtm);
+          r = w < 0 ? 1 : 0;
+        } else if (m >= 0 && them_num == 1)
           r = us_num > 0 && probe_table(pieces, gpos, !wtm) < 0 ? 1 : 0;
         else {
           // probe WDL first: a mated position has D = 0 like a draw
@@ -2853,6 +2858,15 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
   int i, j, k, s, t;
   int sq, sq2;
   bitboard bb;
+
+#ifdef ASEAN
+  // pawnless tables store all positions explicitly (see MAKRUK.md)
+  for (i = 0; i < numpcs; i++)
+    if ((pieces[i] & 0x07) == PAWN)
+      break;
+  if (i == numpcs)
+    return probe_table(pieces, gpos, wtm);
+#endif
 
   if (wtm) {
     for (i = 0; i < numpcs; i++) {

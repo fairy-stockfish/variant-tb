@@ -13,7 +13,10 @@
 
   Wins always have odd D = 2j - 1, losses even D = 2j, so we store
   distances in moves: WIN(j) and LOSS(j). Values beyond the largest possible
-  budget (129 plies) are draws.
+  budget (MK_CAP plies) are draws.
+
+  ASEAN (-DASEAN): the 50-move rule applies, so outside of bare king
+  endings every capture resets the distance (as in Syzygy, see mkrules.h).
 
   The index is the raw mirror-symmetric index described in MAKRUK.md: the
   Khon only moves forward, so only left-right mirroring may be used.
@@ -34,6 +37,7 @@
 #include "util.h"
 
 #include "board.h"
+#include "mkrules.h"
 
 static int white_king = 0, black_king = 1;
 
@@ -45,10 +49,10 @@ static int white_king = 0, black_king = 1;
 // value encoding (one byte per position and side to move)
 #define ILLEGAL 0        // side to move can capture the opponent's king
 #define WIN(j) (j)       // win in 2j - 1 plies, 1 <= j <= MAX_WIN
-#define MAX_WIN 65
+#define MAX_WIN ((MK_CAP + 1) / 2)
 #define LOSS(j) (0x80 + (j)) // loss in 2j plies, 0 <= j <= MAX_LOSS
 #define MATE LOSS(0)
-#define MAX_LOSS 64
+#define MAX_LOSS (MK_CAP / 2)
 #define DRAW 0xfc        // final draw (stalemate, drawing capture, ...)
 #define CHANGED 0xfd     // needs to be checked for a loss
 #define UNKNOWN 0xfe
@@ -169,6 +173,13 @@ static int capture_result(int *pieces, int *gpos, int c, int captured)
   int s = 1 - c;
   if (num_side[s] == 0 && num_side[c] == 1)
     return 0; // bare king against bare king
+
+  if (MK_CAPTURE_RESETS(num_side[0] && num_side[1])) {
+    // the 50-move counter starts afresh: the capture wins if c loses with
+    // a fresh counter, and loses at once (D = 0) if c wins
+    int v = probe_table(pieces, gpos, c == 0);
+    return v < 0 ? WIN(1) : v > 0 ? -1 : 0;
+  }
 
   if (num_side[c] == 1 && (pt[captured] & 0x08) == (c << 3)) {
     // side c is left with a bare king: pieces' honour count starts afresh,
@@ -753,24 +764,6 @@ static void write_dtz(uint8_t *buf)
 
 /* Main */
 
-static int count_limit(int c)
-{
-  // Fairy-Stockfish Position::count_limit() for MAKRUK_COUNTING, in moves,
-  // for the side with pieces c against a bare king
-  int rooks = 0, khons = 0, knights = 0;
-  for (int i = 0; side_pcs[c][i] >= 0; i++) {
-    int t = pt[side_pcs[c][i]] & 0x07;
-    if (t == ROOK) rooks++;
-    if (t == BISHOP) khons++;
-    if (t == KNIGHT) knights++;
-  }
-  if (rooks > 1) return 8;
-  if (rooks == 1) return 16;
-  if (khons > 1) return 22;
-  if (knights > 1) return 32;
-  if (khons == 1) return 44;
-  return 64;
-}
 
 static struct option options[] = {
   { "threads", 1, NULL, 't' },
@@ -874,12 +867,17 @@ int main(int argc, char **argv)
     if (pcs[i] != pcs[i + 8]) symmetric = 0;
   split = !symmetric;
 
-  if (num_side[0] && num_side[1])
-    budget = 129; // board's honour: limit 128 plies, count starts at 0
-  else {
-    // pieces' honour: limit 2L plies, count starts at 2n plies
+  {
     int strong = num_side[0] ? 0 : 1;
-    budget = 2 * count_limit(strong) - 2 * numpcs + 1;
+    int rooks = 0, khons = 0, knights = 0;
+    for (int i = 0; side_pcs[strong][i] >= 0; i++) {
+      int t = pt[side_pcs[strong][i]] & 0x07;
+      rooks += t == ROOK;
+      khons += t == BISHOP;
+      knights += t == KNIGHT;
+    }
+    budget = mk_fresh_budget(numpcs, !(num_side[0] && num_side[1]), rooks,
+        khons, knights);
   }
 
   shift[0] = 6 * (numpcs - 1);

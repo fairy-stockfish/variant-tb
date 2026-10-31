@@ -1,0 +1,6 @@
+PREFIX = astb
+DEPDIR = .depsas
+OBJDIR = objsas
+FLAGS += -DREGULAR -DMAKRUK -DASEAN
+
+include Makefile.mkfamily

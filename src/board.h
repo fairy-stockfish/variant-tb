@@ -31,7 +31,7 @@ static __inline__ int PopCount(bitboard x)
 #include "bmi2.h"
 
 extern bitboard knight_range[64], king_range[64];
-#ifdef SHATRANJ
+#if defined(SHATRANJ) || defined(MAKRUK)
 extern bitboard queen_range[64], bishop_range[64];
 #endif
 #ifdef MAKRUK
@@ -52,7 +52,7 @@ extern bitboard atom_mask[64];
 
 #define KnightRange(x) knight_range[x]
 #define KingRange(x) king_range[x]
-#ifdef SHATRANJ
+#if defined(SHATRANJ) || defined(MAKRUK)
 #undef QueenRange
 #define QueenRange(x,occ) queen_range[x]
 #undef BishopRange

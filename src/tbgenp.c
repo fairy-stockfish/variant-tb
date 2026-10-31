@@ -85,7 +85,9 @@ static uint64_t global_stats_b[MAX_STATS];
 
 #include "genericp.c"
 
-#if defined(REGULAR)
+#if defined(ASEAN)
+#include "astbgenp.c"
+#elif defined(REGULAR)
 #include "rtbgenp.c"
 #elif defined(SUICIDE)
 #include "stbgenp.c"

@@ -16,7 +16,24 @@ import subprocess
 import sys
 
 KING, ROOK, KHON, KNIGHT, MET, PAWN = 'k', 'r', 's', 'n', 'm', 'p'
-CAP = 129  # largest possible counting budget in plies
+CAP = 129  # largest possible budget in plies (set by --variant)
+VARIANT = 'makruk'
+
+
+def pawn_rank_ok(color, r):
+    if VARIANT == 'asean':  # pawns start on the 3rd rank, promote on the 8th
+        return 2 <= r <= 6 if color == 0 else 1 <= r <= 5
+    return 2 <= r <= 4 if color == 0 else 3 <= r <= 5
+
+
+def promotion_rank(color):
+    if VARIANT == 'asean':
+        return 7 if color == 0 else 0
+    return 5 if color == 0 else 2
+
+
+def promotion_pieces():
+    return [MET, ROOK, KHON, KNIGHT] if VARIANT == 'asean' else [MET]
 
 
 def sq(f, r):
@@ -87,18 +104,17 @@ def moves(board, color):
                 if t not in board or board[t][1] != color:
                     targets.append(t)
         for t in targets:
-            b = dict(board)
-            capt = t in b
-            if capt and b[t][0] == KING:
+            if t in board and board[t][0] == KING:
                 continue
-            del b[s]
-            np = p
-            if p == PAWN and (t // 8 == (5 if color == 0 else 2)):
-                np = MET
-            b[t] = (np, c)
-            if in_check(b, color):
-                continue
-            res.append((b, capt or np != p, capt))
+            promo = p == PAWN and t // 8 == promotion_rank(color)
+            for np in promotion_pieces() if promo else [p]:
+                b = dict(board)
+                capt = t in b
+                del b[s]
+                b[t] = (np, c)
+                if in_check(b, color):
+                    continue
+                res.append((b, capt or np != p, capt))
     return res
 
 
@@ -127,6 +143,11 @@ def non_king(board, color):
 
 def count_limit(board, strong):
     pcs = non_king(board, strong)
+    if VARIANT == 'asean':
+        if ROOK in pcs: return 16
+        if KHON in pcs: return 44
+        if KNIGHT in pcs: return 64
+        return 0
     if pcs.count(ROOK) > 1: return 8
     if pcs.count(ROOK) == 1: return 16
     if pcs.count(KHON) > 1: return 22
@@ -141,6 +162,10 @@ def fresh_budget(board):
     if w and b:
         return CAP
     strong = 0 if w else 1
+    if VARIANT == 'asean':
+        # count starts at 0 plies; the 50-move rule applies as well
+        lim = count_limit(board, strong)
+        return min(2 * lim + 1, 100) if lim else 100
     return 2 * count_limit(board, strong) - 2 * len(board) + 1
 
 
@@ -177,7 +202,7 @@ def random_position(spec):
                 break
             if p == PAWN:
                 r = s // 8
-                if (c == 0 and not 2 <= r <= 4) or (c == 1 and not 3 <= r <= 5):
+                if not pawn_rank_ok(c, r):
                     ok = False
                     break
             board[s] = (p, c)
@@ -195,9 +220,19 @@ def expected_pawnless(board, color, prober):
     if not succ:
         return (-2, 0) if in_check(board, color) else (0, 0)
     vals = prober.probe_many([fen(b, 1 - color) for b, _, _ in succ])
-    best_win, worst_loss, has_draw = None, 0, False
+    best_win, worst_loss, has_draw, lost = None, 0, False, False
+    both = non_king(board, 0) and non_king(board, 1)
     for (b, _, capt), (wdl, d) in zip(succ, vals):
         opp = 1 - color
+        if capt and VARIANT == 'asean' and both:
+            # the capture resets the 50-move counter
+            if wdl < 0:
+                best_win = 1
+            elif wdl > 0:
+                lost = True
+            else:
+                has_draw = True
+            continue
         if capt and not non_king(b, opp):
             # opponent left with a bare king: fresh pieces' honour count
             if non_king(b, color) and wdl < 0:
@@ -219,6 +254,8 @@ def expected_pawnless(board, color, prober):
         return (2, best_win) if best_win <= budget else (0, 0)
     if has_draw or best_win is not None or worst_loss > CAP - 1:
         return (0, 0)
+    if lost and not worst_loss:
+        return (-2, 0)  # all moves are captures that lose at once
     return (-2, -worst_loss) if worst_loss <= budget else (0, 0)
 
 
@@ -261,10 +298,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('-n', type=int, default=2000)
     ap.add_argument('-s', type=int, default=1)
-    ap.add_argument('--mprobe', default=os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), 'mprobe'))
+    ap.add_argument('--variant', choices=['makruk', 'asean'], default='makruk')
+    ap.add_argument('--mprobe', help='probing tool (default: mprobe, astbprobe)')
     ap.add_argument('tables', nargs='+')
     args = ap.parse_args()
+    global VARIANT, CAP
+    VARIANT = args.variant
+    CAP = {'makruk': 129, 'asean': 100}[VARIANT]
+    if not args.mprobe:
+        args.mprobe = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   {'makruk': 'mprobe', 'asean': 'astbprobe'}[VARIANT])
+    if VARIANT == 'asean' and any('P' in t for t in args.tables):
+        # with the 50-move rule, WDL values of pawnful tables cannot be
+        # checked without DTZ; use astbverp for them
+        sys.exit('mktest.py: ASEAN pawnful tables are not supported')
     random.seed(args.s)
     prober = Prober(args.mprobe)
     bad = sum(check_table(t, args.n, prober) for t in args.tables)

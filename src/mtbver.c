@@ -29,6 +29,7 @@
 #include <sys/time.h>
 
 #include "board.h"
+#include "mkrules.h"
 #include "decompress.h"
 #include "defs.h"
 #include "threads.h"
@@ -41,7 +42,7 @@ static int white_king = 0, black_king = 1;
 
 #define MAX_PIECES 8
 
-#define CAP 129            // largest possible counting budget in plies
+#define CAP MK_CAP         // largest possible budget in plies
 #define INVALID 0xff       // broken or illegal
 #define V_DRAW 0
 #define V_WIN(j) (j)       // win in 2j - 1 plies
@@ -164,7 +165,7 @@ static void fill(struct thread_data *thread)
 static int expected(int s, const int *p, bitboard occ, int *mate)
 {
   int pieces[MAX_PIECES], q[MAX_PIECES];
-  int best_win = 0, worst_loss = 0, draw = 0, moves = 0;
+  int best_win = 0, worst_loss = 0, draw = 0, moves = 0, loss_moves = 0;
   int king = s; // slot of the king of side s
 
   *mate = 0;
@@ -186,6 +187,7 @@ static int expected(int s, const int *p, bitboard occ, int *mate)
       if (attacked_by(1 - s, q[king], q, occ2, m)) continue;
       moves++;
       int r; // > 0: we win in r plies, < 0: we lose in -r plies, 0: draw
+      int lost = 0; // we lose at once, whatever the counters (D = 0)
       if (m < 0) {
         int v = val[1 - s][encode(q)];
         if (v == V_DRAW) r = 0;
@@ -200,7 +202,12 @@ static int expected(int s, const int *p, bitboard occ, int *mate)
         pieces[m] = 0;
         q[m] = 0;
         int opp_left = num_side[1 - s] - 1;
-        if (opp_left == 0) {
+        if (MK_CAPTURE_RESETS(num_side[0] && num_side[1])) {
+          // ASEAN: the 50-move counter starts afresh
+          int w = probe_table(pieces, q, s == 1);
+          r = w < 0 ? 1 : 0;
+          lost = w > 0;
+        } else if (opp_left == 0) {
           // bare king: a fresh pieces' honour count starts
           r = num_side[s] && probe_table(pieces, q, s == 1) < 0 ? 1 : 0;
         } else {
@@ -209,7 +216,9 @@ static int expected(int s, const int *p, bitboard occ, int *mate)
           r = w < 0 ? -d + 1 : w > 0 ? -(d + 1) : 0;
         }
       }
-      if (r > 0) {
+      if (lost) {
+        loss_moves++;
+      } else if (r > 0) {
         if (!best_win || r < best_win) best_win = r;
       } else if (r < 0) {
         if (-r > worst_loss) worst_loss = -r;
@@ -229,6 +238,11 @@ static int expected(int s, const int *p, bitboard occ, int *mate)
     return best_win <= budget ? best_win : 0;
   if (draw || best_win || worst_loss > CAP - 1)
     return 0;
+  if (!worst_loss) {
+    // all moves are captures that lose at once: lost like a mate (D = 0)
+    *mate = 1;
+    return 0;
+  }
   return worst_loss <= budget ? -worst_loss : 0;
 }
 
@@ -282,22 +296,6 @@ static void check(struct thread_data *thread)
   }
 }
 
-static int count_limit(int c)
-{
-  int rooks = 0, khons = 0, knights = 0;
-  for (int k = 0; k < numpcs; k++) {
-    if (col(k) != c) continue;
-    if ((pt[k] & 7) == ROOK) rooks++;
-    if ((pt[k] & 7) == BISHOP) khons++;
-    if ((pt[k] & 7) == KNIGHT) knights++;
-  }
-  if (rooks > 1) return 8;
-  if (rooks == 1) return 16;
-  if (khons > 1) return 22;
-  if (knights > 1) return 32;
-  if (khons == 1) return 44;
-  return 64;
-}
 
 int main(int argc, char **argv)
 {
@@ -339,10 +337,17 @@ int main(int argc, char **argv)
   symmetric = 1;
   for (int i = 0; i < 8; i++)
     if (pcs[i] != pcs[i + 8]) symmetric = 0;
-  if (num_side[0] && num_side[1])
-    budget = CAP;
-  else
-    budget = 2 * count_limit(num_side[0] ? 0 : 1) - 2 * numpcs + 1;
+  {
+    int strong = num_side[0] ? 0 : 1, rooks = 0, khons = 0, knights = 0;
+    for (int k = 2; k < numpcs; k++)
+      if (col(k) == strong) {
+        rooks += (pt[k] & 7) == ROOK;
+        khons += (pt[k] & 7) == BISHOP;
+        knights += (pt[k] & 7) == KNIGHT;
+      }
+    budget = mk_fresh_budget(numpcs, !(num_side[0] && num_side[1]), rooks,
+        khons, knights);
+  }
 
   init_tablebases();
   set_up_tables();

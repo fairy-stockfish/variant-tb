@@ -45,6 +45,18 @@
 #define TBPATH "ATBPATH"
 #define STATSDIR "ATBSTATSDIR"
 #define LOGFILE "atblog.txt"
+#elif defined(ASEAN)
+#define WDLSUFFIX ".asw"
+#define DTZSUFFIX ".asz"
+#define TBPATH "ASTBPATH"
+#define STATSDIR "ASTBSTATSDIR"
+#define LOGFILE "astblog.txt"
+#elif defined(CAMBODIAN)
+#define WDLSUFFIX ".cmw"
+#define DTZSUFFIX ".cmz"
+#define TBPATH "CMTBPATH"
+#define STATSDIR "CMTBSTATSDIR"
+#define LOGFILE "cmtblog.txt"
 #elif defined(MAKRUK)
 #define WDLSUFFIX ".mkw"
 #define DTZSUFFIX ".mkz"
@@ -67,7 +79,13 @@
 
 #define MAX_TBPIECES 8
 
-#if defined(REGULAR)
+#if defined(ASEAN)
+#define WDL_MAGIC 0x6f1d2a93
+#define DTZ_MAGIC 0x2c8e47b5
+#elif defined(CAMBODIAN)
+#define WDL_MAGIC 0x91b3c6d2
+#define DTZ_MAGIC 0x4e7a0f18
+#elif defined(REGULAR)
 #define WDL_MAGIC 0x5d23e871
 #define DTZ_MAGIC 0xa50c66d7
 #elif defined(ATOMIC)

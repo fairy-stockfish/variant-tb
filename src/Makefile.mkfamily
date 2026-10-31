@@ -1,0 +1,27 @@
+# Common part of Makefile.makruk, Makefile.cambodian and Makefile.asean.
+# Expects PREFIX (binary name prefix), DEPDIR, OBJDIR and FLAGS.
+
+GENTBNAME = $(PREFIX)gen_unused
+GENTBPNAME = $(PREFIX)genp
+VERTBNAME = $(PREFIX)ver_unused
+VERTBPNAME = $(PREFIX)verp
+CLEAN = $(PREFIX)clean
+
+include Makefile.general
+
+MGENTBOBJS = mtbgen.o compress.o huffman.o threads.o lz4.o checksum.o city-c.o util.o
+MPROBEOBJS = mprobe.o threads.o util.o
+MVERTBOBJS = mtbver.o decompress.o threads.o util.o
+
+include $(MGENTBOBJS:%.o=$(DEPDIR)/%.P)
+include $(MPROBEOBJS:%.o=$(DEPDIR)/%.P)
+include $(MVERTBOBJS:%.o=$(DEPDIR)/%.P)
+
+$(PREFIX)gen: $(MGENTBOBJS)
+	$(CC) $(CFLAGS) -o $@ $(MGENTBOBJS:%=$(OBJDIR)/%) $(LDFLAGS)
+
+$(PREFIX)probe: $(MPROBEOBJS)
+	$(CC) $(CFLAGS) -o $@ $(MPROBEOBJS:%=$(OBJDIR)/%) $(LDFLAGS)
+
+$(PREFIX)ver: $(MVERTBOBJS)
+	$(CC) $(CFLAGS) -o $@ $(MVERTBOBJS:%=$(OBJDIR)/%) $(LDFLAGS)

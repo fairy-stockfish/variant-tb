@@ -32,7 +32,7 @@ static uint64_t __inline__ MakeMove(uint64_t idx, int k, int sq)
   return idx | ((uint64_t)sq << shift[k]);
 }
 
-#ifndef MAKRUK
+#if !defined(MAKRUK) || defined(ASEAN)
 #define PAWN_MASK 0xff000000000000ffULL
 #else
 // Makruk pawns never occur on ranks 1, 2, 7 and 8
@@ -444,7 +444,13 @@ static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int
   if (pcs[j] < 0) continue
 
 // squares on which a captured pawn can stand
-#ifndef MAKRUK
+#if defined(ASEAN)
+// ASEAN pawns start on the 3rd/6th rank and promote on the 8th/1st rank
+#define MIN_WPAWN 0x10
+#define MAX_WPAWN 0x38
+#define MIN_BPAWN 0x08
+#define MAX_BPAWN 0x30
+#elif !defined(MAKRUK)
 #define MIN_WPAWN 0x08
 #define MAX_WPAWN 0x38
 #define MIN_BPAWN 0x08

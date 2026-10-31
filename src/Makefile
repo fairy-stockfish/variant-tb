@@ -52,8 +52,14 @@ gtbgen gtbgenp gclean:
 jtbgen jtbgenp jtbver jtbverp jclean:
 	@$(MAKE) -f Makefile.shatranj $@
 
-mtbgen mtbgenp mtbver mtbverp mprobe mclean:
+mtbgen mtbgenp mtbver mtbverp mprobe mtbclean:
 	@$(MAKE) -f Makefile.makruk $@
+
+cmtbgen cmtbver cmtbprobe cmtbclean:
+	@$(MAKE) -f Makefile.cambodian $@
+
+astbgen astbgenp astbver astbverp astbprobe astbclean:
+	@$(MAKE) -f Makefile.asean $@
 
 #atbgen atbgenp atbver atbverp aclean:
 atomic: atbgen atbgenp atbver atbverp tbcheck
@@ -66,9 +72,15 @@ shatranj: jtbgen jtbgenp tbcheck
 
 makruk: mtbgen mtbgenp mtbver mtbverp mprobe tbcheck
 
+cambodian: cmtbgen cmtbver cmtbprobe tbcheck
+
+asean: astbgen astbgenp astbver astbverp astbprobe tbcheck
+
 .PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean \
 	atbgen atbgenp atbver atbverp aclean \
 	stbgen stbgenp sclean \
 	gtbgen gtbgenp gclean \
 	jtbgen jtbgenp jtbver jtbverp jclean \
-	mtbgen mtbgenp mtbver mtbverp mprobe mclean
+	mtbgen mtbgenp mtbver mtbverp mprobe mtbclean \
+	cmtbgen cmtbver cmtbprobe cmtbclean \
+	astbgen astbgenp astbver astbverp astbprobe astbclean

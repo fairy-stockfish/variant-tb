@@ -78,7 +78,9 @@ static int pcs2[MAX_PIECES];
 
 #include "genericp.c"
 
-#if defined(REGULAR)
+#if defined(ASEAN)
+#include "astbverp.c"
+#elif defined(REGULAR)
 #include "rtbverp.c"
 #elif defined(SUICIDE)
 #include "stbverp.c"

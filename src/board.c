@@ -13,7 +13,7 @@
 
 bitboard bit[64];
 bitboard knight_range[64], king_range[64];
-#ifdef SHATRANJ
+#if defined(SHATRANJ) || defined(MAKRUK)
 bitboard bishop_range[64], queen_range[64];
 #endif
 #ifdef MAKRUK
@@ -40,7 +40,7 @@ void set_up_tables(void)
 	     Kx[] = {-1, 0, 1, 1, 1, 0, -1, -1},
 	     Ky[] = {1, 1, 1, 0, -1, -1, -1, 0};
 
-#ifdef SHATRANJ
+#if defined(SHATRANJ) || defined(MAKRUK)
   static int Bx[] = {2, 2, -2, -2},
 	     By[] = {2, -2, 2, -2},
 	     Qx[] = {1, 1, -1, -1},
@@ -87,7 +87,7 @@ void set_up_tables(void)
 	bits |= bit[x + Kx[i] + 8 * (y + Ky[i])];
     king_range[sq] = bits;
 
-#ifdef SHATRANJ
+#if defined(SHATRANJ) || defined(MAKRUK)
     bits = 0;
     for (i = 0; i < 4; i++)
       if (x + Bx[i] >= 0 && x + Bx[i] < 8 && y + By[i] >= 0 && y + By[i] < 8)
