@@ -165,13 +165,44 @@ All tables up to 4 pieces and a selection of 5-piece tables pass
 `mktest.py`, and the counting limit `D <= L - c + 1` was checked against
 Fairy-Stockfish's search.
 
+## Resource usage
+
+Measured on 4 cores (Xeon, 2.8 GHz) with `run_makruk.py --stats`.
+"CPU" is user + system time, the wall clock time is about 40% of it with
+4 threads. RAM is the peak resident size of a single generator run.
+
+| Pieces | Tables | RAM (peak) | CPU time | Disk |
+|--------|--------|------------|----------|------|
+| 3 | 5 | 22 MB | 0.3 s | 19 KB |
+| 4 | 30 | 220 MB | 5 min | 23 MB |
+| 5 | 110 | 2.0 GB | ≈ 14 h (est.) | ≈ 9 GB (est.) |
+| 6 | 365 | ≈ 120 GB (est.) | ≈ 3000 h (est.) | ≈ 2.5–3 TB (est.) |
+
+3 and 4 pieces: all tables measured. 5 pieces: 11 tables measured and
+extrapolated per table class (28 pawnless without khon, 32 pawnless with
+khon, 50 pawnful):
+
+| Class (5 pieces) | CPU per table | RAM | Disk per table |
+|------------------|---------------|-----|----------------|
+| pawnless, no khon (KRNvKM, KRNMvK, KRMvKR, KMMvKM) | 2.5–8 min | 1.6–1.8 GB | 1–52 MB |
+| pawnless, khon (KSMvKM, KRSvKN) | 10–13 min | 1.9–2.0 GB | 200–280 MB |
+| pawnful (KSPvKM, KRPvKR, KMMvKP, KMPvKM, KMPvKP) | 5–9 min | 0.4–0.65 GB | 0.3–20 MB |
+
+6 pieces cannot be measured on this machine. Estimates: pawnless tables
+need `3 · 2048 · 64^4` bytes ≈ 103 GB plus about 20% (measured ratio at 5
+pieces), pawnful tables about 16 GB with `-d` (as for chess). CPU time and
+file sizes grow by a factor of 64–100 per piece in the measurements from 4
+to 5 pieces; the disk estimate is dominated by the pawnless tables with a
+khon (≈ 24 GB each) and is uncertain by a factor of 2–3.
+
 ## Limitations
 
-* Generating a pawnless table needs `2 · 2048 · 64^(n-2)` bytes of RAM plus
-  one buffer of half that size (about 1.6 GB for 5 pieces, 100 GB for 6
-  pieces). Pawnful tables need the same memory as Shatranj tables.
+* Generating a pawnless table needs `3 · 2048 · 64^(n-2)` bytes of RAM
+  (two tables and one output buffer). The generator does not yet exploit
+  the 8-fold symmetry internally, only in the files.
 * `D` behaves like a distance to mate, so pawnless DTZ files are much
-  larger than chess DTZ files (e.g. 188 MB for KRNvKM). The raw index
-  (no 8-fold symmetry even without khons, no capture don't-cares) adds to
-  this. A Syzygy-style permutation-based index would reduce the size.
+  larger than chess DTZ files (e.g. 51 MB for KRNvKM, 167 MB for KSMvKM).
+  Tables with a khon only have the mirror symmetry and dominate the total
+  size. Storing DTZ for one side only (as Syzygy does, with a 1-ply search
+  when probing) would roughly halve the DTZ files.
 * There is no `mtbver`; `tbcheck` verifies the embedded checksums.

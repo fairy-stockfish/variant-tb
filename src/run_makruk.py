@@ -55,10 +55,12 @@ def main():
     ap.add_argument("--bindir", default="", help="directory of mtbgen/mtbgenp")
     ap.add_argument("--list", action="store_true", help="only list the tables")
     ap.add_argument("--stats", help="append resource usage per table to this CSV file")
+    ap.add_argument("--only", nargs="+", metavar="TABLE",
+                    help="process only these tables, in the given order")
     args = ap.parse_args()
 
     os.environ.setdefault("MKTBPATH", ".")
-    for tb in tables(args.min_pcs, args.max_pcs):
+    for tb in args.only or tables(args.min_pcs, args.max_pcs):
         if args.list:
             print(tb)
             continue
