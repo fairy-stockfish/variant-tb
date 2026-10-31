@@ -201,7 +201,7 @@ static void table_name(struct pos *P, char *str)
 
 struct dtz_table {
   char name[16];
-  uint8_t *data;
+  struct PairsData *d;
   struct TBEntry_piece entry;
   int side;
   int flags;
@@ -211,6 +211,68 @@ struct dtz_table {
 };
 
 static struct dtz_table *dtz_tables = NULL;
+
+// Decode a single value of a compressed DTZ table. Same as decompress_pairs()
+// in probe.c, but without the lookup tables, which decomp_setup_pairs() does
+// not build.
+static uint8_t dtz_decompress(struct PairsData *d, uint64_t idx)
+{
+  if (!d->idxbits)
+    return d->min_len;
+
+  uint32_t mainidx = idx >> d->idxbits;
+  int litidx = (idx & ((1 << d->idxbits) - 1)) - (1 << (d->idxbits - 1));
+  uint32_t block;
+  memcpy(&block, d->indextable + 6 * mainidx, sizeof(block));
+  litidx += *(uint16_t *)(d->indextable + 6 * mainidx + 4);
+  if (litidx < 0) {
+    do {
+      litidx += d->sizetable[--block] + 1;
+    } while (litidx < 0);
+  } else {
+    while (litidx > d->sizetable[block])
+      litidx -= d->sizetable[block++] + 1;
+  }
+
+  uint32_t *ptr = (uint32_t *)(d->data + ((uint64_t)block << d->blocksize));
+
+  int m = d->min_len;
+  uint16_t *offset = d->offset;
+  uint64_t *base = d->base - m;
+  uint8_t *symlen = d->symlen;
+  int sym, bitcnt, l;
+
+  uint64_t code = __builtin_bswap64(*((uint64_t *)ptr));
+  ptr += 2;
+  bitcnt = 0; // number of "empty bits" in code
+  for (;;) {
+    l = m;
+    while (code < base[l]) l++;
+    sym = offset[l] + ((code - base[l]) >> (64 - l));
+    if (litidx < (int)symlen[sym] + 1) break;
+    litidx -= (int)symlen[sym] + 1;
+    code <<= l;
+    bitcnt += l;
+    if (bitcnt >= 32) {
+      bitcnt -= 32;
+      code |= (uint64_t)(__builtin_bswap32(*ptr++)) << bitcnt;
+    }
+  }
+
+  uint8_t *sympat = d->sympat;
+  while (symlen[sym] != 0) {
+    uint8_t *w = sympat + 3 * sym;
+    int s1 = ((w[1] & 0xf) << 8) | w[0];
+    if (litidx < (int)symlen[s1] + 1)
+      sym = s1;
+    else {
+      litidx -= (int)symlen[s1] + 1;
+      sym = (w[2] << 4) | (w[1] >> 4);
+    }
+  }
+
+  return *(sympat + 3 * sym);
+}
 
 static struct dtz_table *get_dtz_table(struct pos *P)
 {
@@ -253,12 +315,14 @@ static struct dtz_table *get_dtz_table(struct pos *P)
   decomp_init_piece(pcs);
   struct tb_handle *H = open_tb_handle(path, 0);
   decomp_init_table(H);
-  uint8_t *data = decompress_table(H, 0, 0);
+  fclose(H->F);
 
+  // The table stays compressed in the memory-mapped file; values are
+  // decoded on demand, so probing many tables does not need much RAM.
   T = malloc(sizeof(*T));
   strcpy(T->name, name);
-  T->data = malloc(H->file[0].size[0]);
-  memcpy(T->data, data, H->file[0].size[0]);
+  T->d = H->entry_piece.precomp[0];
+  T->d->data = H->data + H->file[0].idx[0];
   T->entry = H->entry_piece;
   T->side = get_dtz_side(H, 0);
   T->flags = H->dtz_flags[0];
@@ -320,7 +384,7 @@ static int probe_dtz(struct pos *P)
     }
     uint64_t idx = encode_piece(&T->entry, T->entry.norm[0], pos,
                                 T->entry.factor[0]);
-    int value = T->data[idx];
+    int value = dtz_decompress(T->d, idx);
     static const int wdl_map[] = { 1, 3, 0, 2, 0 };
     if (T->flags & 2) {
       if (T->map)
