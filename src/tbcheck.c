@@ -22,7 +22,7 @@ static void compare_checksums(char *file)
     return;
   }
   while (!feof(F)) {
-    int num = fscanf(F, "%100[KQRBNP|v|rtbwz|.]: %32[0-9|a-f]\n", name, sum);
+    int num = fscanf(F, "%100[KQRBNP|v|rtbwz|ajgsk|.]: %32[0-9|a-f]\n", name, sum);
     if (num != 2 || strlen(sum) != 32) {
       fprintf(stderr, "Could not completely parse %s.\n", file);
       break;

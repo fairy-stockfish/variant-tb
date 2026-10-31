@@ -34,6 +34,81 @@ tables should be stored on an SSD for decent performance (when used by
 a chess engine during search).
 
 
+### Racing Kings
+
+The generator also supports Racing Kings ("make racing"), which builds:
+* ktbgen for generating Racing Kings tablebases (.ktbw/.ktbz files).
+* ktbver for verifying them.
+* kprobe, a simple command line tool that prints WDL and DTZ values of
+positions given as FEN (`kprobe -m FEN` also lists all legal moves).
+
+Tables are looked up in the directories listed in **$KTBPATH**.
+Usage is the same as for rtbgen/rtbver, e.g. `ktbgen -t 8 KRvKN`.
+All tables can be generated with `run.py --racing --generate --max 6`
+(the script generates them in the right order).
+
+Rules implemented: no move may leave the own king in check or give check
+(so positions with a king in check are illegal); a player whose king
+reaches the 8th rank wins, except that it is a draw if white reached the
+8th rank first and black can reach it (with a legal move) on the very next
+move. Stalemate and the 50-move rule are handled as in normal chess.
+
+Differences from the regular tables:
+* There is no color symmetry: white and black material are not
+interchangeable (black has the tie rule in its favour), so KRvK and KvKR
+are separate tables. Up to 6 pieces there are 494 tables.
+* Only the left-right mirror symmetry can be used. The generator places the
+white king on files a-d (1806 king pairs instead of 462), and the file
+format encodes the leading piece on files a-d (WDL_MAGIC 0x6b4f2ad9,
+DTZ_MAGIC 0x3c91e75b). Existing Syzygy probing code cannot read these
+files; see src/probe.c and src/kprobe.c for reference probing code.
+* KvK is not stored in a file; its value follows from the race rules and
+is computed by the probing code.
+* Positions in which the game is over (a king on the 8th rank) are stored
+with their real value (loss for the side to move if the opponent's king
+arrived, draw if both kings are on the 8th rank or if black to move can
+still reach it). Unreachable positions (e.g. white to move with only the
+white king on the 8th rank) are "don't care". Probing code must check for
+a finished race before searching captures, as src/probe.c does.
+
+Independent checks (using the move generator of python-chess) are in
+src/tests: `rk_check_full.py KRvK` solves all positions of a small table
+and compares them with kprobe, `rk_check_sample.py 1000 KQvKR KRvKNN`
+checks the minimax consistency of random positions.
+
+#### Resource requirements (Racing Kings)
+
+A Racing Kings table is about 3.9 times larger (in positions) than a
+regular table with the same number of pieces, because only the left-right
+symmetry can be used.
+
+| Pieces | Tables | RAM (peak per run) | Disk (WDL + DTZ) | CPU time (total) | Wall time, 4 threads |
+|---|---|---|---|---|---|
+| 3 (measured) | 8 | ~25 MB | 60 KB (20 KB + 40 KB) | ~3 s | ~2 s |
+| 4 (measured) | 36 | ~250 MB | 16 MB (4.5 MB + 11.7 MB) | ~13.5 min | ~5 min |
+| 5 (7 tables measured, rest estimated) | 120 | 1.4-1.8 GB | ~3.4 GB (~0.8 GB + ~2.6 GB) | ~10 CPU hours | ~3 h |
+| 6 (estimated) | 330 | ~62 GB with -d, up to ~90 GB without | ~550 GB (~130 GB + ~420 GB), range 350-750 GB | ~1800 CPU hours, range 1200-4000 | 3-6 days with 32 cores |
+
+Measurements were taken on a 4-core cloud machine with `ktbgen -t 4`.
+
+* RAM: for 3 and 4 pieces it is mostly fixed overhead. From 5 pieces on,
+the generator holds two tables of 1806 * 64^(n-2) bytes each (white and
+black to move) plus, without -d, a buffer for the permuted table
+(5 pieces: 2 * 0.47 GB + 0.46 GB; 6 pieces: 2 * 30.3 GB plus up to
+27 GB without -d). ktbver also needs about 61 GB for 6-piece tables.
+* Disk: with -d the generator writes intermediate files; plan roughly
+50-100 GB of extra free space for 6-piece tables (estimate). The 6-piece
+size is the least certain number: it assumes a per-table growth factor of
+50-64 from 5 to 6 pieces (measured from 4 to 5 pieces: about 63).
+* CPU: for 4 pieces most time is spent searching the best compression
+permutation (8-29 s per table). A 5-piece table took 230-373 s CPU time
+(about 290 s on average). The 6-piece estimate assumes about 5.5 CPU hours
+per table (64 times more positions); it may be considerably slower
+because memory accesses on 60 GB tables miss the caches much more often.
+Verification adds about 20-25 % of the generation time.
+* 7-piece tables are not realistic (about 4 TB of RAM).
+
+
 ### Tablebase generator
 
 The directory src/ contains the tablebase generator code. It should be

@@ -10,3 +10,10 @@ OBJDIR = objsk
 FLAGS += -DRACING
 
 include Makefile.general
+
+KPROBEOBJS = kprobe.o decompress.o threads.o checksum.o city-c.o util.o
+
+include $(DEPDIR)/kprobe.P
+
+kprobe: $(KPROBEOBJS)
+	$(CC) $(CFLAGS) -o kprobe $(KPROBEOBJS:%=$(OBJDIR)/%) $(LDFLAGS)

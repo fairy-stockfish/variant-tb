@@ -12,6 +12,9 @@ retrograde tablebases using helper binaries (rtbgen/rtbgenp, rtbver/rtbverp).
 - Optional disk hint (--disk) that passes -d only when len==max (matching run.pl).
 - Thread count via --threads (passed to tools with -t).
 - Respects RTBWDIR, defaulting to "." (like the Perl version).
+- With --racing, generates/verifies Racing Kings tables (ktbgen/ktbver,
+  .ktbw/.ktbz, $KTBPATH). In Racing Kings white and black material are not
+  interchangeable, so e.g. KRvK and KvKR are separate tables.
 """
 import argparse
 import os
@@ -28,6 +31,7 @@ def build_parser():
     p.add_argument("--disk", action="store_true", help="Pass -d (only when piece-count == --max)")
     p.add_argument("--min", dest="min_pcs", type=int, default=3, help="Minimum total pieces including both kings (default: 3)")
     p.add_argument("--max", dest="max_pcs", type=int, default=4, help="Maximum total pieces including both kings (default: 4)")
+    p.add_argument("--racing", action="store_true", help="Racing Kings tables (ktbgen/ktbver)")
     return p
 
 PIECES = ["Q","R","B","N","P"]
@@ -79,11 +83,45 @@ def process_tb(tb, args):
         else:
             run_cmd(f"rtbverp -h {tb}")
 
+def process_racing_tb(tb, args):
+    total_pieces = len(tb) - 1
+    if total_pieces < args.min_pcs or total_pieces > args.max_pcs:
+        return
+
+    dopt = "-d " if args.disk and total_pieces == args.max_pcs else ""
+
+    if args.generate and not Path(f"{tb}.ktbz").exists():
+        print(f"Generating {tb}")
+        run_cmd(f"ktbgen {dopt}-t {args.threads} --stats {tb}")
+
+    if args.verify:
+        print(f"Verifying {tb}")
+        run_cmd(f"ktbver -t {args.threads} --log {tb}")
+
+    if args.huffman and Path(f"{tb}.ktbw").exists():
+        run_cmd(f"ktbver -h {tb}")
+
+def racing_tables(max_pcs):
+    """All K<white>vK<black> tables, ordered by number of pieces so that
+    subtables are generated first."""
+    pieces = ["Q", "R", "B", "N"]
+    for total in range(1, max_pcs - 1):
+        for w_count in range(total, -1, -1):
+            for w_seq in combinations_with_replacement(pieces, w_count):
+                for b_seq in combinations_with_replacement(pieces, total - w_count):
+                    yield "K" + "".join(w_seq) + "vK" + "".join(b_seq)
+
 def main():
+    args = build_parser().parse_args()
+
+    if args.racing:
+        os.environ.setdefault("KTBPATH", ".")
+        for tb in racing_tables(args.max_pcs):
+            process_racing_tb(tb, args)
+        return
+
     # Default RTBWDIR="." as in Perl
     os.environ.setdefault("RTBPATH", ".")
-
-    args = build_parser().parse_args()
 
     # We generate *all* classes up to 5-man by iterating over attacker/defender piece counts.
     # This generalizes the explicit nested loops in the Perl script while preserving set ordering.
