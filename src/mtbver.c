@@ -28,6 +28,7 @@
 #include <string.h>
 #include <sys/time.h>
 
+#define HAS_PAWNS
 #include "board.h"
 #include "mkrules.h"
 #include "decompress.h"
@@ -58,6 +59,7 @@ static int pt[MAX_PIECES];
 static int num_side[2];
 static int symmetric;
 static int budget;
+static int num_pawns;
 static uint64_t size;
 static uint8_t *val[2];
 static uint64_t *work;
@@ -86,6 +88,14 @@ static inline uint64_t encode(const int *p)
   for (int k = 1; k < numpcs; k++)
     idx = (idx << 6) | (p[k] ^ m);
   return idx;
+}
+
+static inline int pawns_valid(const int *p)
+{
+  for (int k = 2; k < numpcs; k++)
+    if ((pt[k] & 7) == PAWN && !MK_PAWN_RANK_OK(col(k), p[k] >> 3))
+      return 0;
+  return 1;
 }
 
 static inline int attacked_by(int c, int sq, const int *p, bitboard occ,
@@ -133,7 +143,7 @@ static void fill(struct thread_data *thread)
       decode(idx, p);
       bitboard occ = 0;
       for (int k = 0; k < numpcs; k++) occ |= bit[p[k]];
-      if (__builtin_popcountll(occ) != numpcs
+      if (__builtin_popcountll(occ) != numpcs || !pawns_valid(p)
           || attacked_by(s, p[1 - s], p, occ, -1)) {
         val[s][idx] = INVALID;
         continue;
@@ -171,7 +181,13 @@ static int expected(int s, const int *p, bitboard occ, int *mate)
   *mate = 0;
   for (int k = 0; k < numpcs; k++) {
     if (col(k) != s) continue;
+    int pawn = (pt[k] & 7) == PAWN;
     bitboard bb = PieceRange(p[k], pt[k], occ);
+    if (pawn) {
+      // captures diagonally forward, moves one step forward
+      int fwd = p[k] + (s ? -8 : 8);
+      bb = (bb & occ) | ((occ & bit[fwd]) ? 0 : bit[fwd]);
+    }
     while (bb) {
       int to = FirstOne(bb);
       ClearFirst(bb);
@@ -181,6 +197,10 @@ static int expected(int s, const int *p, bitboard occ, int *mate)
           if (p[m] == to) break;
         if (col(m) == s || m == 1 - s) continue; // own piece or king
       }
+      int promo = pawn && (to >> 3) == (s ? 2 : 5);
+#ifdef ASEAN
+      promo = pawn && (to >> 3) == (s ? 0 : 7);
+#endif
       memcpy(q, p, sizeof(q));
       q[k] = to;
       bitboard occ2 = (occ & ~bit[p[k]]) | bit[to];
@@ -188,7 +208,7 @@ static int expected(int s, const int *p, bitboard occ, int *mate)
       moves++;
       int r; // > 0: we win in r plies, < 0: we lose in -r plies, 0: draw
       int lost = 0; // we lose at once, whatever the counters (D = 0)
-      if (m < 0) {
+      if (m < 0 && !promo) {
         int v = val[1 - s][encode(q)];
         if (v == V_DRAW) r = 0;
         else if (v >= V_LOSS(0) && v <= V_LOSS(64)) r = 2 * (v - V_LOSS(0)) + 1;
@@ -198,18 +218,37 @@ static int expected(int s, const int *p, bitboard occ, int *mate)
           exit(1);
         }
       } else {
+        // capture and/or promotion: the position is in a subtable
         for (int i = 0; i < numpcs; i++) pieces[i] = pt[i];
-        pieces[m] = 0;
-        q[m] = 0;
-        int opp_left = num_side[1 - s] - 1;
-        if (MK_CAPTURE_RESETS(num_side[0] && num_side[1])) {
+        int pawn_captured = m >= 0 && (pt[m] & 7) == PAWN;
+        if (m >= 0) {
+          pieces[m] = 0;
+          q[m] = 0;
+        }
+        if (promo) pieces[k] = QUEEN | (pt[k] & 8);
+        int us_left = num_side[s];
+        int opp_left = num_side[1 - s] - (m >= 0);
+        int pawns_left = num_pawns - pawn_captured - promo;
+        // Fairy-Stockfish do_move(): a fresh pieces' honour count starts if
+        // after a capture or promotion the side to move has a bare king and
+        // no pawns are left, or (not in ASEAN) if a bare king captured the
+        // last pawn
+        int fresh = !pawns_left && ((!opp_left && us_left)
+            || (pawn_captured && !us_left && opp_left));
+#ifdef ASEAN
+        fresh = !pawns_left && !opp_left && us_left;
+#endif
+        if (m >= 0 && MK_CAPTURE_RESETS(num_side[0] && num_side[1])) {
           // ASEAN: the 50-move counter starts afresh
           int w = probe_table(pieces, q, s == 1);
           r = w < 0 ? 1 : 0;
           lost = w > 0;
-        } else if (opp_left == 0) {
-          // bare king: a fresh pieces' honour count starts
-          r = num_side[s] && probe_table(pieces, q, s == 1) < 0 ? 1 : 0;
+        } else if (!us_left && !opp_left) {
+          r = 0; // bare kings
+        } else if (fresh) {
+          int w = probe_table(pieces, q, s == 1);
+          r = w < 0 ? 1 : 0;
+          lost = w > 0;
         } else {
           int w = probe_table(pieces, q, s == 1);
           int d = w ? probe_dtz_makruk(pieces, q, s == 1) : 0;
@@ -325,8 +364,11 @@ int main(int argc, char **argv)
     case 'S': t = BISHOP; break;
     case 'N': t = KNIGHT; break;
     case 'M': t = QUEEN; break;
+#ifdef CAMBODIAN
+    case 'P': t = PAWN; break;
+#endif
     default:
-      fprintf(stderr, "Invalid pawnless table name.\n");
+      fprintf(stderr, "Invalid table name.\n");
       exit(1);
     }
     pt[numpcs++] = t | c;
@@ -345,8 +387,9 @@ int main(int argc, char **argv)
         khons += (pt[k] & 7) == BISHOP;
         knights += (pt[k] & 7) == KNIGHT;
       }
-    budget = mk_fresh_budget(numpcs, !(num_side[0] && num_side[1]), rooks,
-        khons, knights);
+    num_pawns = pcs[WPAWN] + pcs[BPAWN];
+    budget = mk_fresh_budget(numpcs,
+        !(num_side[0] && num_side[1]) && !num_pawns, rooks, khons, knights);
   }
 
   init_tablebases();

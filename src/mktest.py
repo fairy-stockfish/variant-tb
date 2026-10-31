@@ -114,7 +114,7 @@ def moves(board, color):
                 b[t] = (np, c)
                 if in_check(b, color):
                     continue
-                res.append((b, capt or np != p, capt))
+                res.append((b, capt or np != p, capt, np != p))
     return res
 
 
@@ -143,6 +143,13 @@ def non_king(board, color):
 
 def count_limit(board, strong):
     pcs = non_king(board, strong)
+    if VARIANT == 'cambodian':
+        if pcs.count(ROOK) > 1: return 7
+        if pcs.count(ROOK) == 1: return 15
+        if pcs.count(KHON) > 1: return 21
+        if pcs.count(KNIGHT) > 1: return 31
+        if pcs.count(KHON) == 1: return 43
+        return 63
     if VARIANT == 'asean':
         if ROOK in pcs: return 16
         if KHON in pcs: return 44
@@ -159,8 +166,8 @@ def count_limit(board, strong):
 def fresh_budget(board):
     """Fresh counting budget in plies of a pawnless position."""
     w, b = non_king(board, 0), non_king(board, 1)
-    if w and b:
-        return CAP
+    if (w and b) or PAWN in w + b:
+        return CAP  # board's honour (Cambodian: also with pawns)
     strong = 0 if w else 1
     if VARIANT == 'asean':
         # count starts at 0 plies; the 50-move rule applies as well
@@ -219,11 +226,41 @@ def expected_pawnless(board, color, prober):
     succ = moves(board, color)
     if not succ:
         return (-2, 0) if in_check(board, color) else (0, 0)
-    vals = prober.probe_many([fen(b, 1 - color) for b, _, _ in succ])
+    vals = prober.probe_many([fen(b, 1 - color) for b, _, _, _ in succ])
     best_win, worst_loss, has_draw, lost = None, 0, False, False
     both = non_king(board, 0) and non_king(board, 1)
-    for (b, _, capt), (wdl, d) in zip(succ, vals):
+    pawns_before = sum(1 for p, _ in board.values() if p == PAWN)
+    for (b, _, capt, promo), (wdl, d) in zip(succ, vals):
         opp = 1 - color
+        if VARIANT == 'cambodian':
+            # Fairy-Stockfish do_move(): after a capture or promotion, a
+            # fresh pieces' honour count starts if the opponent has a bare
+            # king and no pawns are left, or if our bare king captured the
+            # last pawn; otherwise the count continues
+            pawns = sum(1 for p, _ in b.values() if p == PAWN)
+            us, them = non_king(b, color), non_king(b, opp)
+            fresh = (capt or promo) and not pawns and (
+                (not them and us) or
+                (capt and pawns < pawns_before - promo and not us and them))
+            if (capt or promo) and not us and not them:
+                has_draw = True
+                continue
+            if fresh:
+                if wdl < 0:
+                    best_win = 1
+                elif wdl > 0:
+                    lost = True
+                else:
+                    has_draw = True
+                continue
+            if wdl < 0:
+                r = -d + 1
+                best_win = r if best_win is None else min(best_win, r)
+            elif wdl > 0:
+                worst_loss = max(worst_loss, d + 1)
+            else:
+                has_draw = True
+            continue
         if capt and VARIANT == 'asean' and both:
             # the capture resets the 50-move counter
             if wdl < 0:
@@ -263,7 +300,7 @@ def expected_pawnful(board, color, prober):
     succ = moves(board, color)
     if not succ:
         return -2 if in_check(board, color) else 0
-    vals = prober.probe_many([fen(b, 1 - color) for b, _, _ in succ])
+    vals = prober.probe_many([fen(b, 1 - color) for b, _, _, _ in succ])
     best = -2
     for wdl, _ in vals:
         v = -wdl
@@ -273,7 +310,7 @@ def expected_pawnful(board, color, prober):
 
 
 def check_table(spec, n, prober):
-    pawnful = 'P' in spec
+    pawnful = 'P' in spec and VARIANT != 'cambodian'
     bad = 0
     for _ in range(n):
         board, color = random_position(spec)
@@ -298,16 +335,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('-n', type=int, default=2000)
     ap.add_argument('-s', type=int, default=1)
-    ap.add_argument('--variant', choices=['makruk', 'asean'], default='makruk')
+    ap.add_argument('--variant', choices=['makruk', 'asean', 'cambodian'],
+                    default='makruk')
     ap.add_argument('--mprobe', help='probing tool (default: mprobe, astbprobe)')
     ap.add_argument('tables', nargs='+')
     args = ap.parse_args()
     global VARIANT, CAP
     VARIANT = args.variant
-    CAP = {'makruk': 129, 'asean': 100}[VARIANT]
+    CAP = {'makruk': 129, 'asean': 100, 'cambodian': 127}[VARIANT]
     if not args.mprobe:
         args.mprobe = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   {'makruk': 'mprobe', 'asean': 'astbprobe'}[VARIANT])
+                                   {'makruk': 'mprobe', 'asean': 'astbprobe',
+                                    'cambodian': 'cmtbprobe'}[VARIANT])
     if VARIANT == 'asean' and any('P' in t for t in args.tables):
         # with the 50-move rule, WDL values of pawnful tables cannot be
         # checked without DTZ; use astbverp for them

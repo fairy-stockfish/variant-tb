@@ -9,8 +9,9 @@
     <wdl> <dtz>
 
   wdl is the WDL value for the side to move (pawnless tables: with a
-  freshly started count). For pawnless positions dtz is the signed counting
-  distance D in plies (see MAKRUK.md), for pawnful positions it is 0.
+  freshly started count). For pawnless positions (and for all Cambodian
+  positions) dtz is the signed distance D in plies (see MAKRUK.md), for
+  pawnful positions it is 0.
 */
 
 #include <stdio.h>
@@ -93,7 +94,11 @@ int main(void)
     int wdl, dtz = 0;
     if (numpcs == 2)
       wdl = 0;
+#ifdef CAMBODIAN
+    else if (1) { // all Cambodian tables store D
+#else
     else if (!numpawns) {
+#endif
       wdl = probe_table(pieces, pos, wtm);
       dtz = probe_dtz_makruk(pieces, pos, wtm);
     } else

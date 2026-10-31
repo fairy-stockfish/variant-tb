@@ -35,7 +35,12 @@
 #define TBMAX_PAWN 1386
 #define HSHMAX 12
 #elif defined(MAKRUK)
+#ifdef CAMBODIAN
+// all Cambodian tables, also those with pawns, use the raw index
+#define TBMAX_PIECE 8000
+#else
 #define TBMAX_PIECE 2000
+#endif
 #define TBMAX_PAWN 6000
 #define HSHMAX 24
 #elif defined(SHATRANJ)
@@ -216,7 +221,11 @@ static void init_tb(char *str)
     key += (tb_piece_key[i+1]*pcs[i+1]) + (tb_piece_key[i+9]*pcs[i+9]);
     key2 += (tb_piece_key[i+1]*pcs[i+9]) + (tb_piece_key[i+9]*pcs[i+1]);
   }
+#ifdef CAMBODIAN
+  if (1) {
+#else
   if (pcs[WPAWN] + pcs[BPAWN] == 0) {
+#endif
     if (TBnum_piece == TBMAX_PIECE) {
       fprintf(stderr, "TBMAX_PIECE limit too low!\n");
       exit(1);
@@ -235,7 +244,11 @@ static void init_tb(char *str)
   for (i = 0; i < 16; i++)
     entry->num += pcs[i];
   entry->symmetric = (key == key2);
+#ifdef CAMBODIAN
+  entry->has_pawns = 0;
+#else
   entry->has_pawns = (pcs[WPAWN] + pcs[BPAWN] > 0);
+#endif
 
   if (entry->has_pawns) {
     struct TBEntry_pawn *ptr = (struct TBEntry_pawn *)entry;
@@ -2726,19 +2739,21 @@ static int mk_num_pieces(int *pieces, int c)
 }
 
 // D for the side to move that is not stored in the DTZ file: search all
-// moves. Non-captures lead to positions of the stored side; captures lead
-// to subtables (with the count continuing), or leave the opponent with a
-// bare king, which starts a fresh pieces' honour count.
+// moves. Non-captures lead to positions of the stored side. Captures and
+// promotions lead to subtables (the count continues), unless they start a
+// fresh count (see mk_fresh_count()) or, for ASEAN, reset the 50-move
+// counter; then the WDL value of the resulting position decides.
 static int mk_dtz_search(int *pieces, int *gpos, int wtm, int wdl)
 {
   int us = wtm ? 0 : 8, them = us ^ 8;
   int best = wdl > 0 ? INT32_MAX : 0;
-  int king = 0;
+  int king = 0, pawns = 0;
   bitboard occ = 0, own = 0;
 
   for (int i = 0; i < numpcs; i++)
     if (pieces[i]) {
       occ |= bit[gpos[i]];
+      if ((pieces[i] & 0x07) == PAWN) pawns++;
       if ((pieces[i] & 0x08) == us) {
         own |= bit[gpos[i]];
         if ((pieces[i] & 0x07) == KING) king = i;
@@ -2751,7 +2766,12 @@ static int mk_dtz_search(int *pieces, int *gpos, int wtm, int wdl)
     int t = pieces[j];
     if (!t || (t & 0x08) != us) continue;
     int from = gpos[j];
+    int pawn = (t & 0x07) == PAWN;
     bitboard bb = PieceRange(from, t, occ) & ~own;
+    if (pawn) {
+      int to = from + (us ? -8 : 8);
+      bb = (bb & occ) | ((occ & bit[to]) ? 0 : bit[to]);
+    }
     while (bb) {
       int to = FirstOne(bb);
       ClearFirst(bb);
@@ -2761,19 +2781,28 @@ static int mk_dtz_search(int *pieces, int *gpos, int wtm, int wdl)
           if (pieces[m] && gpos[m] == to) break;
         if ((pieces[m] & 0x07) == KING) continue;
       }
+      int promo = pawn && (to >> 3) == MK_PROMO_RANK(us >> 3);
       int cap = m >= 0 ? pieces[m] : 0;
       bitboard occ2 = (occ & ~bit[from]) | bit[to];
       if (m >= 0) pieces[m] = 0;
+      if (promo) pieces[j] = QUEEN | us;
       gpos[j] = to;
       if (!mk_attacked(pieces, gpos, gpos[king], them, occ2)) {
         int r; // result for us: > 0 win in r, < 0 loss in -r, 0 draw
+        int them_left = them_num - (m >= 0);
+        int pawns_left = pawns - ((cap & 0x07) == PAWN) - promo;
         if (m >= 0 && MK_CAPTURE_RESETS(us_num > 0 && them_num > 0)) {
           // fresh 50-move counter: a losing capture loses at once (D = 0)
           int w = probe_table(pieces, gpos, !wtm);
           r = w < 0 ? 1 : 0;
-        } else if (m >= 0 && them_num == 1)
-          r = us_num > 0 && probe_table(pieces, gpos, !wtm) < 0 ? 1 : 0;
-        else {
+        } else if ((m >= 0 || promo) && !us_num && !them_left)
+          r = 0; // bare kings
+        else if ((m >= 0 || promo)
+            && mk_fresh_count(us_num, them_left, pawns_left,
+              (cap & 0x07) == PAWN)) {
+          // fresh count: a losing move loses at once (D = 0)
+          r = probe_table(pieces, gpos, !wtm) < 0 ? 1 : 0;
+        } else {
           // probe WDL first: a mated position has D = 0 like a draw
           int w = probe_table(pieces, gpos, !wtm);
           int d = w ? probe_dtz_makruk(pieces, gpos, !wtm) : 0;
@@ -2783,6 +2812,7 @@ static int mk_dtz_search(int *pieces, int *gpos, int wtm, int wdl)
         if (wdl < 0 && r < 0 && -r > best) best = -r;
       }
       gpos[j] = from;
+      pieces[j] = t;
       if (m >= 0) pieces[m] = cap;
     }
   }
@@ -2979,6 +3009,10 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
 
   // Pawnless tables store all positions explicitly: captures do not reset
   // the counting rules, so no capture search must be done.
+#ifdef CAMBODIAN
+  // the same holds for all Cambodian tables
+  return probe_table(pieces, gpos, wtm);
+#endif
   for (i = 0; i < numpcs; i++)
     if ((pieces[i] & 0x07) == PAWN)
       break;

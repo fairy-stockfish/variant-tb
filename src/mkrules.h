@@ -69,4 +69,34 @@ static inline int mk_fresh_budget(int n, int bare, int rooks, int khons,
 #define MK_CAPTURE_RESETS(both_sides_have_pieces) 0
 #endif
 
+// Pawns (ranks counted from 0): Makruk and Cambodian pawns stand on ranks
+// 2-4 (white) / 3-5 (black) and promote to a met on rank 5 / 2; ASEAN pawns
+// stand on ranks 2-6 / 1-5 and promote on rank 7 / 0.
+#if defined(ASEAN)
+#define MK_PAWN_RANK_OK(c, r) ((c) ? (r) >= 1 && (r) <= 5 : (r) >= 2 && (r) <= 6)
+#define MK_PROMO_RANK(c) ((c) ? 0 : 7)
+#else
+#define MK_PAWN_RANK_OK(c, r) ((c) ? (r) >= 3 && (r) <= 5 : (r) >= 2 && (r) <= 4)
+#define MK_PROMO_RANK(c) ((c) ? 2 : 5)
+#endif
+
+// Does a capture or promotion start a fresh pieces' honour count
+// (Fairy-Stockfish do_move())? Arguments describe the position after the
+// move: non-king pieces (including pawns) of the moving side and of the
+// other side, the number of pawns left, and whether a pawn was captured.
+// Returns 1 if the other side, which is to move, now counts with a bare
+// king, 2 if the moving side counts (a bare king captured the last pawn),
+// and 0 otherwise (the current count continues).
+static inline int mk_fresh_count(int mover_pcs, int other_pcs, int pawns,
+    int pawn_captured)
+{
+  if (pawns) return 0;
+  if (other_pcs == 0 && mover_pcs > 0) return 1;
+#if !defined(ASEAN)
+  if (pawn_captured && mover_pcs == 0 && other_pcs > 0) return 2;
+#endif
+  (void)pawn_captured;
+  return 0;
+}
+
 #endif

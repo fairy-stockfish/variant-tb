@@ -36,6 +36,7 @@
 #include "threads.h"
 #include "util.h"
 
+#define HAS_PAWNS
 #include "board.h"
 #include "mkrules.h"
 
@@ -75,6 +76,7 @@ static int shift[MAX_PIECES];
 static uint64_t mask[MAX_PIECES];
 static uint64_t mirror_all;
 static int budget;          // fresh budget in plies, see MAKRUK.md
+static int num_pawns;       // number of pawns (Cambodian tables only)
 static uint64_t *work_g;
 static int minfreq = 8;
 
@@ -137,6 +139,59 @@ static inline int attacks(int c, int sq, const int *p, bitboard occ, int skip)
   return 0;
 }
 
+static inline int is_pawn(int k)
+{
+  return (pt[k] & 0x07) == PAWN;
+}
+
+// non-capture moves of the piece in slot k (for a pawn including a
+// promotion, see is_promotion())
+static inline bitboard quiet_moves(int k, const int *p, bitboard occ)
+{
+  if (!is_pawn(k))
+    return range_of(k, p[k], occ) & ~occ;
+  int to = p[k] + (color_of(k) ? -8 : 8);
+  return (occ & bit[to]) ? 0 : bit[to];
+}
+
+static inline int is_promotion(int k, int to)
+{
+  return is_pawn(k) && (to >> 3) == MK_PROMO_RANK(color_of(k));
+}
+
+// squares from which the piece in slot k on sq can have made a non-capture
+// (resp. capture) move to sq
+static inline bitboard retro_quiet(int k, int sq, bitboard occ)
+{
+  if (!is_pawn(k))
+    return PieceRetroMoves(sq, pt[k], occ);
+  int c = color_of(k);
+  int from = sq + (c ? 8 : -8);
+  if ((sq >> 3) == MK_PROMO_RANK(c) || !MK_PAWN_RANK_OK(c, from >> 3)
+      || (occ & bit[from]))
+    return 0;
+  return bit[from];
+}
+
+static inline bitboard retro_capture(int k, int sq, bitboard occ)
+{
+  if (!is_pawn(k))
+    return PieceRetroMoves(sq, pt[k], occ);
+  int c = color_of(k);
+  if ((sq >> 3) == MK_PROMO_RANK(c)) return 0;
+  int r = (sq >> 3) + (c ? 1 : -1);
+  if (!MK_PAWN_RANK_OK(c, r)) return 0;
+  return pawn_range[c ^ 1][sq] & ~occ;
+}
+
+static inline int pawns_ok(const int *p, int skip)
+{
+  for (int k = 2; k < numpcs; k++)
+    if (k != skip && is_pawn(k) && !MK_PAWN_RANK_OK(color_of(k), p[k] >> 3))
+      return 0;
+  return 1;
+}
+
 static inline void atomic_min_u8(uint8_t *x, uint8_t v)
 {
   uint8_t cur = __atomic_load_n(x, __ATOMIC_RELAXED);
@@ -164,31 +219,39 @@ static inline void note_win(int j)
 }
 
 /*
-  Result of a capture by side s (1 - c) leading to a position of the
-  subtable with side c to move.
+  Result of a capture and/or promotion by side s (1 - c) leading to a
+  position of a subtable with side c to move (captured: slot of the captured
+  piece or -1, promoted: a pawn promoted).
   Returns j > 0 for WIN(j), -j - 1 for LOSS(j) and 0 for a draw.
 */
-static int capture_result(int *pieces, int *gpos, int c, int captured)
+static int cross_result(int *pieces, int *gpos, int c, int captured,
+    int promoted)
 {
   int s = 1 - c;
-  if (num_side[s] == 0 && num_side[c] == 1)
+  int s_left = num_side[s];
+  int c_left = num_side[c] - (captured >= 0);
+  int pawn_captured = captured >= 0 && is_pawn(captured);
+  int pawns_left = num_pawns - pawn_captured - promoted;
+
+  if (s_left == 0 && c_left == 0)
     return 0; // bare king against bare king
 
-  if (MK_CAPTURE_RESETS(num_side[0] && num_side[1])) {
+  if (captured >= 0 && MK_CAPTURE_RESETS(num_side[0] && num_side[1])) {
     // the 50-move counter starts afresh: the capture wins if c loses with
     // a fresh counter, and loses at once (D = 0) if c wins
     int v = probe_table(pieces, gpos, c == 0);
     return v < 0 ? WIN(1) : v > 0 ? -1 : 0;
   }
 
-  if (num_side[c] == 1 && (pt[captured] & 0x08) == (c << 3)) {
-    // side c is left with a bare king: pieces' honour count starts afresh,
-    // so we have reached a winning event if c loses with a fresh count
+  if (mk_fresh_count(s_left, c_left, pawns_left, pawn_captured)) {
+    // a pieces' honour count starts afresh: the move wins if c loses with
+    // a fresh count, and loses at once (D = 0) if c wins
     int v = probe_table(pieces, gpos, c == 0);
-    return v < 0 ? WIN(1) : 0;
+    return v < 0 ? WIN(1) : v > 0 ? -1 : 0;
   }
 
-  // probe WDL first: a mated position has D = 0 like a draw
+  // the count continues; probe WDL first: a mated position has D = 0 like
+  // a draw
   int w = probe_table(pieces, gpos, c == 0);
   int d = w ? probe_dtz_makruk(pieces, gpos, c == 0) : 0;
   if (w < 0) { // c loses in -d plies (even, 0 if mated)
@@ -208,7 +271,7 @@ static void calc_init(struct thread_data *thread)
   for (uint64_t idx = thread->begin; idx < thread->end; idx++) {
     decode(idx, p);
     bitboard occ = occupancy(p, -1);
-    if (__builtin_popcountll(occ) != numpcs) {
+    if (__builtin_popcountll(occ) != numpcs || !pawns_ok(p, -1)) {
       table[0][idx] = table[1][idx] = BROKEN;
       continue;
     }
@@ -238,16 +301,18 @@ static void calc_captures(struct thread_data *thread)
     if ((idx >> shift[m]) & 0x3f) continue;
     decode(idx, p);
     bitboard occ = occupancy(p, m);
-    if (__builtin_popcountll(occ) != numpcs - 1) continue;
+    if (__builtin_popcountll(occ) != numpcs - 1 || !pawns_ok(p, m)) continue;
     // s just captured, so s must not be in check
     if (attacks(c, p[king_slot(s)], p, occ, m)) continue;
 
-    int r = capture_result(pieces, p, c, m);
+    int r = cross_result(pieces, p, c, m, 0);
 
     for (int i = 0; side_pcs[s][i] >= 0; i++) {
       int k = side_pcs[s][i];
       int sq = p[k];
-      bitboard bb = PieceRetroMoves(sq, pt[k], occ);
+      // the captured piece stood on sq
+      if (is_pawn(m) && !MK_PAWN_RANK_OK(c, sq >> 3)) continue;
+      bitboard bb = retro_capture(k, sq, occ);
       while (bb) {
         int o = FirstOne(bb);
         ClearFirst(bb);
@@ -267,21 +332,75 @@ static void calc_captures(struct thread_data *thread)
   }
 }
 
+// Promotions (with or without capture) lead to subtables; mark their
+// results in the positions in which they can be played.
+static void calc_promotions(struct thread_data *thread)
+{
+  int p[MAX_PIECES], q[MAX_PIECES];
+  int pieces[MAX_PIECES];
+
+  for (int s = 0; s < 2; s++) {
+    int c = 1 - s;
+    for (uint64_t idx = thread->begin; idx < thread->end; idx++) {
+      uint8_t *x = &table[s][idx];
+      if (*x == BROKEN || *x == ILLEGAL) continue;
+      decode(idx, p);
+      bitboard occ = occupancy(p, -1);
+      for (int i = 0; side_pcs[s][i] >= 0; i++) {
+        int k = side_pcs[s][i];
+        if (!is_pawn(k) || (p[k] >> 3) + (s ? -1 : 1) != MK_PROMO_RANK(s))
+          continue;
+        bitboard bb = (range_of(k, p[k], occ) & occ) | quiet_moves(k, p, occ);
+        while (bb) {
+          int sq = FirstOne(bb);
+          ClearFirst(bb);
+          int m = -1;
+          if (occ & bit[sq]) {
+            for (m = 0; m < numpcs; m++)
+              if (p[m] == sq) break;
+            if (color_of(m) == s || m == king_slot(c)) continue;
+          }
+          for (int l = 0; l < numpcs; l++) {
+            q[l] = p[l];
+            pieces[l] = pt[l];
+          }
+          q[k] = sq;
+          pieces[k] = QUEEN | (pt[k] & 0x08);
+          if (m >= 0) pieces[m] = 0;
+          bitboard occ2 = (occ & ~bit[p[k]]) | bit[sq];
+          if (attacks(c, q[king_slot(s)], q, occ2, m)) continue; // illegal
+          int r = cross_result(pieces, q, c, m, 1);
+          if (r > 0) {
+            atomic_min_u8(x, WIN(r));
+            note_win(r);
+          } else if (r == 0)
+            atomic_min_u8(x, DRAW);
+          else
+            set_changed(x);
+        }
+      }
+    }
+  }
+}
+
 // does the side to move have a legal non-capture move?
 static int has_move(int s, uint64_t idx, const int *p, bitboard occ)
 {
   uint8_t *opp = table[1 - s];
   for (int i = 0; side_pcs[s][i] >= 0; i++) {
     int k = side_pcs[s][i];
-    bitboard bb = range_of(k, p[k], occ) & ~occ;
+    bitboard bb = quiet_moves(k, p, occ);
     while (bb) {
       int sq = FirstOne(bb);
       ClearFirst(bb);
+      if (is_promotion(k, sq)) continue; // marked by calc_promotions()
       if (opp[move_idx(idx, p, k, sq)] != ILLEGAL) return 1;
     }
   }
   return 0;
 }
+
+static int check_loss(int s, uint64_t idx, int *p, bitboard occ, int j);
 
 static void calc_mates(struct thread_data *thread)
 {
@@ -289,11 +408,22 @@ static void calc_mates(struct thread_data *thread)
 
   for (int s = 0; s < 2; s++)
     for (uint64_t idx = thread->begin; idx < thread->end; idx++) {
-      if (table[s][idx] != UNKNOWN) continue;
+      int v = table[s][idx];
+      if (v != UNKNOWN && v != CHANGED) continue;
       decode(idx, p);
       bitboard occ = occupancy(p, -1);
       if (has_move(s, idx, p, occ)) continue;
-      // no legal moves (and no legal captures, which would have been marked)
+      if (v == CHANGED) {
+        // Only captures or promotions, all losing. If they all lose at once
+        // (D = 0, a fresh count or 50-move counter for the opponent), the
+        // position is lost like a mate. It has to be found here, so that
+        // the WIN(1) of its predecessors is dispatched by iterate().
+        if (check_loss(s, idx, p, occ, 0) == 0)
+          table[s][idx] = MATE;
+        continue;
+      }
+      // no legal moves (legal captures and promotions would have been
+      // marked)
       if (attacks(1 - s, p[king_slot(s)], p, occ, -1))
         table[s][idx] = MATE;
       else
@@ -310,7 +440,7 @@ static void retro(int c, uint64_t idx, const int *p, bitboard occ, int mode,
   uint8_t *tbl = table[s];
   for (int i = 0; side_pcs[s][i] >= 0; i++) {
     int k = side_pcs[s][i];
-    bitboard bb = PieceRetroMoves(p[k], pt[k], occ);
+    bitboard bb = retro_quiet(k, p[k], occ);
     while (bb) {
       int o = FirstOne(bb);
       ClearFirst(bb);
@@ -336,10 +466,11 @@ static int check_loss(int s, uint64_t idx, int *p, bitboard occ, int j)
 
   for (int i = 0; side_pcs[s][i] >= 0; i++) {
     int k = side_pcs[s][i];
-    bitboard bb = range_of(k, p[k], occ) & ~occ;
+    bitboard bb = quiet_moves(k, p, occ);
     while (bb) {
       int sq = FirstOne(bb);
       ClearFirst(bb);
+      if (is_promotion(k, sq)) continue; // handled below
       int v = opp[move_idx(idx, p, k, sq)];
       if (v == ILLEGAL) continue;
       if (!IS_WIN(v) || v > j) return -2;
@@ -347,29 +478,35 @@ static int check_loss(int s, uint64_t idx, int *p, bitboard occ, int j)
     }
   }
 
-  // all non-captures lose; captures are known to lose as well (otherwise
-  // the position would have been marked as win or draw), determine how fast
+  // all non-captures lose; captures and promotions are known to lose as
+  // well (otherwise the position would have been marked as win or draw),
+  // determine how fast
   int c = 1 - s;
   int pieces[MAX_PIECES], q[MAX_PIECES];
   for (int i = 0; side_pcs[s][i] >= 0; i++) {
     int k = side_pcs[s][i];
-    bitboard bb = range_of(k, p[k], occ) & occ;
+    bitboard bb = (range_of(k, p[k], occ) & occ) | quiet_moves(k, p, occ);
     while (bb) {
       int sq = FirstOne(bb);
       ClearFirst(bb);
-      int m;
-      for (m = 0; m < numpcs; m++)
-        if (p[m] == sq) break;
-      if (color_of(m) == s || m == king_slot(c)) continue;
+      int m = -1;
+      if (occ & bit[sq]) {
+        for (m = 0; m < numpcs; m++)
+          if (p[m] == sq) break;
+        if (color_of(m) == s || m == king_slot(c)) continue;
+      } else if (!is_promotion(k, sq))
+        continue;
       for (int l = 0; l < numpcs; l++) {
         q[l] = p[l];
         pieces[l] = pt[l];
       }
       q[k] = sq;
-      pieces[m] = 0;
-      bitboard occ2 = occ & ~bit[p[k]];
+      int promoted = is_promotion(k, sq);
+      if (promoted) pieces[k] = QUEEN | (pt[k] & 0x08);
+      if (m >= 0) pieces[m] = 0;
+      bitboard occ2 = (occ & ~bit[p[k]]) | bit[sq];
       if (attacks(c, q[king_slot(s)], q, occ2, m)) continue; // illegal
-      int r = capture_result(pieces, q, c, m);
+      int r = cross_result(pieces, q, c, m, promoted);
       if (r >= 0) return -2; // should not happen
       if (-r - 1 > best) best = -r - 1;
     }
@@ -824,8 +961,13 @@ int main(int argc, char **argv)
       color = 0x08;
       continue;
     case 'P':
+#ifdef CAMBODIAN
+      t = PAWN;
+      break;
+#else
       fprintf(stderr, "Use mtbgenp for tables with pawns.\n");
       exit(1);
+#endif
     default:
       fprintf(stderr, "Invalid table name.\n");
       exit(1);
@@ -843,12 +985,12 @@ int main(int argc, char **argv)
   }
 
   // slots: white king, black king, then the other pieces grouped by type
-  static const int order[] = { ROOK, BISHOP, KNIGHT, QUEEN };
+  static const int order[] = { ROOK, BISHOP, KNIGHT, QUEEN, PAWN };
   int n = 0;
   pt[n++] = WKING;
   pt[n++] = BKING;
   for (int c = 0; c < 2; c++)
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 5; i++)
       for (int j = 0; j < pcs[order[i] | (c << 3)]; j++)
         pt[n++] = order[i] | (c << 3);
   for (int c = 0; c < 2; c++) {
@@ -876,8 +1018,10 @@ int main(int argc, char **argv)
       khons += t == BISHOP;
       knights += t == KNIGHT;
     }
-    budget = mk_fresh_budget(numpcs, !(num_side[0] && num_side[1]), rooks,
-        khons, knights);
+    num_pawns = pcs[WPAWN] + pcs[BPAWN];
+    // pieces' honour needs a bare king and no pawns on the board
+    budget = mk_fresh_budget(numpcs,
+        !(num_side[0] && num_side[1]) && !num_pawns, rooks, khons, knights);
   }
 
   shift[0] = 6 * (numpcs - 1);
@@ -910,6 +1054,10 @@ int main(int argc, char **argv)
   printf("Calculating captures.\n");
   for (capt_slot = 2; capt_slot < numpcs; capt_slot++)
     run_threaded(calc_captures, work_g, 1);
+  if (num_pawns) {
+    printf("Calculating promotions.\n");
+    run_threaded(calc_promotions, work_g, 1);
+  }
   printf("Calculating mate positions.\n");
   run_threaded(calc_mates, work_g, 1);
 

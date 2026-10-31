@@ -206,7 +206,7 @@ static inline uint64_t mk_raw_index(int *pos, int n, int flip)
   return idx;
 }
 
-// Tables without khon (piece type 3) also use the symmetries that flip
+// Tables without khon (piece type 3) and pawns also use the symmetries that flip
 // the board vertically and along the a1-h8 diagonal. Only canonical
 // positions are stored (the others are don't cares):
 // - all tables: identical pieces have ascending squares;
@@ -219,7 +219,7 @@ static inline uint64_t mk_raw_index(int *pos, int n, int flip)
 static inline int mk_sym8(const uint8_t *pc, int n)
 {
   for (int i = 0; i < n; i++)
-    if ((pc[i] & 0x07) == MK_KHON) return 0;
+    if ((pc[i] & 0x07) == MK_KHON || (pc[i] & 0x07) == 1) return 0; // pawn
   return 1;
 }
 
