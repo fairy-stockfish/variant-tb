@@ -245,6 +245,13 @@ Only treat tablebases with at most n pieces.
 Use this option to generate 6-piece tables on a system with 16 GB of RAM.
 
 
+### Makruk
+
+Generators for Makruk (Thai chess) tables, including the counting rules of
+Fairy-Stockfish, are built with `make makruk` (`mtbgen`, `mtbgenp`,
+`mprobe`). See [MAKRUK.md](MAKRUK.md) for the rules, the file format and
+how an engine has to interpret the tables.
+
 ### Adding tablebase support to your program
 See here:
 https://github.com/syzygy1/probetool

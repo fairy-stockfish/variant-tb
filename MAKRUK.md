@@ -66,8 +66,11 @@ WDL value:
   count).
 * **DTZ file**: `D` for every non-drawn position, *for both sides to move*
   (the file has two sub-tables, like a WDL file, unless the material is
-  symmetric). Decoding is the standard Syzygy DTZ decoding with
-  ply-accurate flags, i.e. the stored value is `D - 1`.
+  symmetric). The symbol `s` read from the sub-table is mapped as in
+  Syzygy DTZ files (`v = map[0][s]` for wins and `v = map[1][s]` for
+  losses if flag bit 2 is set, otherwise `v = s`). Then `D = v + 1` for
+  wins and `D = v` for losses (so that mated positions can be stored with
+  `D = 0`).
 
 Since the count at any reachable state is never more favourable than a
 fresh count, a WDL draw is always a draw, and `D` only matters for
@@ -101,10 +104,11 @@ format (generator based on the Shatranj pawnful generator):
 
 ### Raw index of pawnless tables
 
-Pieces are stored in the order given by the header of each sub-table
-(white king, black king, then the other pieces). The white king is mirrored
-to files a–d (if it is on files e–h, all squares are mirrored `sq ^ 7`).
-Then
+Each sub-table header lists the piece types in index order (white king,
+black king, then the other pieces; identical pieces are adjacent, and the
+order of the remaining groups is chosen per sub-table for best
+compression). The white king is mirrored to files a–d (if it is on files
+e–h, all squares are mirrored `sq ^ 7`). Then
 
 ```
 idx = ((wk_rank * 4 + wk_file) * 64 + bk) << (6 * (n - 2))
@@ -115,7 +119,8 @@ Identical pieces are not sorted; every permutation is stored. Positions with
 black to move in a non-symmetric table are looked up in the second
 sub-table. For symmetric material and for probes where the colours of the
 table are swapped, colours are swapped and the board is flipped vertically
-(`sq ^ 0x38`) before mirroring, exactly as in Syzygy.
+(`sq ^ 0x38`) before mirroring, exactly as in Syzygy. `mk_raw_index()` in
+`src/probe.h` is the reference implementation.
 
 ## Engine integration (Fairy-Stockfish)
 
@@ -129,9 +134,31 @@ table are swapped, colours are swapped and the board is flipped vertically
   position with minimal `D` (the opponent's loss distance + 1), the losing
   side one with maximal `D`.
 
-## Generator
+## Tools
 
-* `mtbgen` generates pawnless tables, `mtbgenp` pawnful tables
-  (`make makruk`). Subtables must be generated first (see `src/run.py`).
-* Generating a pawnless table needs `2 · 2048 · 64^(n-2)` bytes of RAM
-  (about 1 GB for 5 pieces, 69 GB for 6 pieces).
+* `mtbgen KRSvKN` generates a pawnless table, `mtbgenp KRPvKR` a pawnful
+  table (`make makruk` builds both, `mprobe` and `tbcheck`). Option
+  `-t n` sets the number of threads.
+* `src/run_makruk.py --max 5 --threads 4` generates all tables up to the
+  given number of pieces in dependency order (stronger side as white).
+* `mprobe` reads FENs (Makruk letters, only board and side to move are
+  used) from stdin and prints the WDL value and `D`.
+* `src/mktest.py TABLE...` checks random positions of the given tables:
+  it recomputes each stored value from the stored values of all successor
+  positions with an independent Python implementation of the rules and of
+  the semantics above.
+
+All tables up to 4 pieces and a selection of 5-piece tables pass
+`mktest.py`, and the counting limit `D <= L - c + 1` was checked against
+Fairy-Stockfish's search.
+
+## Limitations
+
+* Generating a pawnless table needs `2 · 2048 · 64^(n-2)` bytes of RAM plus
+  one buffer of half that size (about 1.6 GB for 5 pieces, 100 GB for 6
+  pieces). Pawnful tables need the same memory as Shatranj tables.
+* `D` behaves like a distance to mate, so pawnless DTZ files are much
+  larger than chess DTZ files (e.g. 188 MB for KRNvKM). The raw index
+  (no 8-fold symmetry even without khons, no capture don't-cares) adds to
+  this. A Syzygy-style permutation-based index would reduce the size.
+* There is no `mtbver`; `tbcheck` verifies the embedded checksums.
