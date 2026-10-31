@@ -13,6 +13,7 @@ the current directory, which is also used as MKTBPATH for subtables.
 import argparse
 import os
 import subprocess
+import time
 from itertools import combinations_with_replacement
 from pathlib import Path
 
@@ -53,6 +54,7 @@ def main():
     ap.add_argument("--max", dest="max_pcs", type=int, default=4)
     ap.add_argument("--bindir", default="", help="directory of mtbgen/mtbgenp")
     ap.add_argument("--list", action="store_true", help="only list the tables")
+    ap.add_argument("--stats", help="append resource usage per table to this CSV file")
     args = ap.parse_args()
 
     os.environ.setdefault("MKTBPATH", ".")
@@ -65,8 +67,21 @@ def main():
         prog = "mtbgenp" if "P" in tb else "mtbgen"
         cmd = [os.path.join(args.bindir, prog), "-t", str(args.threads), tb]
         print("$ " + " ".join(cmd), flush=True)
-        if subprocess.run(cmd).returncode != 0:
+        t0 = time.time()
+        proc = subprocess.Popen(cmd)
+        _, status, ru = os.wait4(proc.pid, 0)
+        proc.returncode = os.waitstatus_to_exitcode(status)
+        if proc.returncode != 0:
             raise SystemExit("Generating %s failed" % tb)
+        if args.stats:
+            new = not Path(args.stats).exists()
+            with open(args.stats, "a") as f:
+                if new:
+                    f.write("table,pieces,wall_s,cpu_s,maxrss_mb,wdl_bytes,dtz_bytes\n")
+                f.write("%s,%d,%.1f,%.1f,%.1f,%d,%d\n" % (
+                    tb, len(tb) - 1, time.time() - t0, ru.ru_utime + ru.ru_stime,
+                    ru.ru_maxrss / 1024, Path(tb + ".mkw").stat().st_size,
+                    Path(tb + ".mkz").stat().st_size))
 
 
 if __name__ == "__main__":

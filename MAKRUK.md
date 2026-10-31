@@ -40,9 +40,10 @@ Fairy-Stockfish's `makruk` variant exactly.
 
 ### Pawnless tables (`KRSvKN`, `KMMvK`, ...)
 
-The Khon only moves forward, so the 8-fold board symmetry used by Syzygy
-for pawnless tables does not apply. Makruk pawnless tables therefore only
-use the left-right mirror symmetry and a simple "raw" index (see below).
+The Khon only moves forward, so tables with a khon only have the
+left-right mirror symmetry; tables without khon have the full 8-fold
+symmetry. Both use a simple "raw" index in which only canonical positions
+are stored (see below).
 
 Counting makes the value of a pawnless position depend on the current
 count, so these tables store a *distance* `D` (in plies) together with a
@@ -115,12 +116,24 @@ idx = ((wk_rank * 4 + wk_file) * 64 + bk) << (6 * (n - 2))
       | sq[2] << (6 * (n - 3)) | ... | sq[n - 1]
 ```
 
-Identical pieces are not sorted; every permutation is stored. Positions with
-black to move in a non-symmetric table are looked up in the second
-sub-table. For symmetric material and for probes where the colours of the
-table are swapped, colours are swapped and the board is flipped vertically
-(`sq ^ 0x38`) before mirroring, exactly as in Syzygy. `mk_raw_index()` in
-`src/probe.h` is the reference implementation.
+Only canonical positions are stored; all other indices are don't cares.
+To probe, the position is transformed into its canonical form first:
+
+1. Tables without khon: mirror the board horizontally (`sq ^ 7`) if the
+   white king is on files e–h, vertically (`sq ^ 0x38`) if it is on ranks
+   5–8, and along the a1–h8 diagonal if it is above the diagonal, so that
+   it ends up in the triangle a1–d1–d4. Tables with khon: only mirror
+   horizontally if the white king is on files e–h.
+2. Sort the squares of identical pieces in ascending order.
+3. Tables without khon, white king on the diagonal: also reflect the
+   position in the diagonal and sort as in step 2, and use whichever of
+   the two square sequences (in index order) is lexicographically smaller.
+
+Positions with black to move in a non-symmetric table are looked up in the
+second sub-table. For symmetric material and for probes where the colours
+of the table are swapped, colours are swapped and the board is flipped
+vertically (`sq ^ 0x38`) first, exactly as in Syzygy. `mk_probe_index()`
+in `src/probe.h` is the reference implementation.
 
 ## Engine integration (Fairy-Stockfish)
 

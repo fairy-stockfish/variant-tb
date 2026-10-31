@@ -2605,7 +2605,7 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
       if (i < entry->num && pc[i] != pc[i + 1]) j = 0;
     }
 #ifdef MAKRUK
-    idx = mk_raw_index(pos, entry->num, mirror);
+    idx = mk_probe_index(pos, pc, entry->num, mirror);
 #else
     idx = encode_piece(entry, entry->norm[bside], pos, entry->factor[bside]);
 #endif
@@ -2750,7 +2750,7 @@ int probe_dtz_makruk(int *restrict pieces, int *restrict gpos, int wtm)
     pos[i] = gpos[j++];
     if (i < entry->num && pc[i] != pc[i + 1]) j = 0;
   }
-  uint64_t idx = mk_raw_index(pos, entry->num, mirror);
+  uint64_t idx = mk_probe_index(pos, pc, entry->num, mirror);
   int v = decompress_pairs(entry->dtz_precomp[bside], idx);
   if (entry->dtz_flags[bside] & 2)
     v = entry->dtz_map[bside][wdl > 0 ? 0 : 1][v];

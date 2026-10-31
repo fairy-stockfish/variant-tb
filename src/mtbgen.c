@@ -501,18 +501,40 @@ static inline uint64_t src_index(uint64_t idx, const int *ord)
   return src;
 }
 
+static uint8_t map_pc[MAX_PIECES];
+static int map_sym8, map_dc;
+
+static void set_map_order(const int *ord)
+{
+  memcpy(map_ord, ord, sizeof(map_ord));
+  for (int k = 0; k < numpcs; k++)
+    map_pc[k] = pt[ord[k]];
+  map_sym8 = mk_sym8(map_pc, numpcs);
+}
+
+// value of an output index; non-canonical positions are don't cares
+static inline uint8_t map_value(uint64_t idx, const uint8_t *src,
+    const uint8_t *v)
+{
+  int q[MAX_PIECES];
+  decode(idx, q);
+  if (!mk_is_canonical(q, map_pc, numpcs, map_sym8))
+    return map_dc;
+  return v[src[src_index(idx, map_ord)]];
+}
+
 static void map_table(struct thread_data *thread)
 {
   uint8_t *src = map_src;
   uint8_t *dst = map_dst;
   for (uint64_t idx = thread->begin; idx < thread->end; idx++)
-    dst[idx] = wdl_v[src[src_index(idx, map_ord)]];
+    dst[idx] = map_value(idx, src, wdl_v);
 }
 
 static void run_map(uint8_t *dst, uint8_t *src, uint8_t *v, const int *ord)
 {
   memcpy(wdl_v, v, 256);
-  memcpy(map_ord, ord, sizeof(map_ord));
+  set_map_order(ord);
   map_src = src;
   map_dst = dst;
   run_threaded(map_table, work_g, 0);
@@ -562,9 +584,10 @@ static void choose_order(uint8_t *src, uint8_t *v, int wdl, int *best_ord)
     for (int i = 0, k = 2; i < ng; i++)
       for (int j = 0; j < glen[perm[i]]; j++)
         ord[k++] = groups[perm[i]] + j;
+    set_map_order(ord);
     for (uint64_t i = 0; i < num_segs; i++)
       for (uint64_t j = 0; j < seg_size; j++)
-        dst[i * seg_size + j] = v[src[src_index(segs[i] + j, ord)]];
+        dst[i * seg_size + j] = map_value(segs[i] + j, src, v);
     struct HuffCode *c = construct_pairs_u8(dst, dsize, 20, 100, wdl);
     uint64_t csize = calc_size(c);
     free(c);
@@ -621,6 +644,7 @@ static void write_wdl(uint8_t *buf)
     for (int i = 0; i < 256; i++)
       if (stats[s][i] && v[i] < 5) vals[v[i]] = 1;
     compress_init_wdl(vals, 0);
+    map_dc = 8;
     compress_side(G, buf, s, v, 1);
   }
   merge_tb(G);
@@ -694,6 +718,7 @@ static void write_dtz(uint8_t *buf)
         v[LOSS(j)] = map->inv_map[1][2 * j];
 
     compress_init_dtz_u8(map);
+    map_dc = dc;
     compress_side(G, buf, s, v, 0);
   }
   merge_tb(G);

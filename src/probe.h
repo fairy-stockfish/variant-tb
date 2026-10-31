@@ -187,6 +187,81 @@ static inline uint64_t mk_raw_index(int *pos, int n, int flip)
   return idx;
 }
 
+// Tables without khon (piece type 3) also use the symmetries that flip
+// the board vertically and along the a1-h8 diagonal. Only canonical
+// positions are stored (the others are don't cares):
+// - all tables: identical pieces have ascending squares;
+// - tables without khon: the white king is in the triangle a1-d1-d4, and
+//   if it is on the diagonal, the position is not larger (as a sequence of
+//   squares in index order) than its reflection in the diagonal.
+#define MK_KHON 3
+#define MK_TRANSPOSE(sq) ((((sq) & 0x07) << 3) | ((sq) >> 3))
+
+static inline int mk_sym8(const uint8_t *pc, int n)
+{
+  for (int i = 0; i < n; i++)
+    if ((pc[i] & 0x07) == MK_KHON) return 0;
+  return 1;
+}
+
+static inline void mk_sort_groups(int *q, const uint8_t *pc, int n)
+{
+  for (int i = 3; i < n; i++)
+    for (int j = i; j > 2 && pc[j - 1] == pc[j] && q[j - 1] > q[j]; j--) {
+      int t = q[j]; q[j] = q[j - 1]; q[j - 1] = t;
+    }
+}
+
+static inline int mk_less(const int *a, const int *b, int n)
+{
+  for (int i = 1; i < n; i++)
+    if (a[i] != b[i]) return a[i] < b[i];
+  return 0;
+}
+
+// is the position q (squares in index order, white king on files a-d)
+// canonical?
+static inline int mk_is_canonical(const int *q, const uint8_t *pc, int n,
+    int sym8)
+{
+  for (int i = 3; i < n; i++)
+    if (pc[i - 1] == pc[i] && q[i - 1] > q[i]) return 0;
+  if (!sym8) return 1;
+  int f = q[0] & 0x07, r = q[0] >> 3;
+  if (r > f) return 0;
+  if (r < f) return 1;
+  int t[TBPIECES];
+  for (int i = 0; i < n; i++)
+    t[i] = MK_TRANSPOSE(q[i]);
+  mk_sort_groups(t, pc, n);
+  return !mk_less(t, q, n);
+}
+
+// index of a position for probing: canonicalize, then compute the raw index
+static inline uint64_t mk_probe_index(const int *pos, const uint8_t *pc,
+    int n, int flip)
+{
+  int q[TBPIECES];
+  int sym8 = mk_sym8(pc, n);
+  int m = ((pos[0] ^ flip) & 0x04) ? 0x07 : 0;
+  if (sym8 && ((pos[0] ^ flip) & 0x20)) m |= 0x38;
+  for (int i = 0; i < n; i++)
+    q[i] = pos[i] ^ flip ^ m;
+  if (sym8 && (q[0] >> 3) > (q[0] & 0x07))
+    for (int i = 0; i < n; i++)
+      q[i] = MK_TRANSPOSE(q[i]);
+  mk_sort_groups(q, pc, n);
+  if (sym8 && (q[0] >> 3) == (q[0] & 0x07)) {
+    int t[TBPIECES];
+    for (int i = 0; i < n; i++)
+      t[i] = MK_TRANSPOSE(q[i]);
+    mk_sort_groups(t, pc, n);
+    if (mk_less(t, q, n))
+      for (int i = 0; i < n; i++) q[i] = t[i];
+  }
+  return mk_raw_index(q, n, 0);
+}
+
 int probe_dtz_makruk(int *pieces, int *gpos, int wtm);
 #endif
 
