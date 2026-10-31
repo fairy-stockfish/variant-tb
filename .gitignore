@@ -12,3 +12,21 @@ objs*/
 [rasgjl]tbverp
 tbcheck
 __pycache__/
+# Makruk, Cambodian and ASEAN chess
+*.mk[wz]
+*.cm[wz]
+*.as[wz]
+mtbgen
+mtbgenp
+mtbver
+mtbverp
+mtbprobe
+mprobe
+cmtbgen
+cmtbver
+cmtbprobe
+astbgen
+astbgenp
+astbver
+astbverp
+astbprobe

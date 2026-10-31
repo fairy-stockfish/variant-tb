@@ -45,6 +45,12 @@
 #define TBPATH "ATBPATH"
 #define STATSDIR "ATBSTATSDIR"
 #define LOGFILE "atblog.txt"
+#elif defined(MAKRUK)
+#define WDLSUFFIX ".mkw"
+#define DTZSUFFIX ".mkz"
+#define TBPATH "MKTBPATH"
+#define STATSDIR "MKTBSTATSDIR"
+#define LOGFILE "mktblog.txt"
 #elif defined(SHATRANJ)
 #define WDLSUFFIX ".jtbw"
 #define DTZSUFFIX ".jtbz"
@@ -67,6 +73,9 @@
 #elif defined(ATOMIC)
 #define WDL_MAGIC 0x49a48d55
 #define DTZ_MAGIC 0xeb5ea991
+#elif defined(MAKRUK)
+#define WDL_MAGIC 0x3ac9d5e1
+#define DTZ_MAGIC 0x7b51e2c4
 #elif defined(SHATRANJ)
 #define WDL_MAGIC 0xb4e9b3b7
 #define DTZ_MAGIC 0x87c126fc
@@ -128,6 +137,14 @@ struct TBEntry_piece {
   uint8_t pieces[2][TBPIECES];
   uint8_t norm[2][TBPIECES];
   uint8_t order[2];
+#ifdef MAKRUK
+  char name[2 * TBPIECES + 4];
+  uint8_t dtz_ready;
+  uint8_t dtz_flags[2];
+  uint8_t dtz_pieces[2][TBPIECES];
+  struct PairsData *dtz_precomp[2];
+  uint8_t *dtz_map[2][2];
+#endif
 };
 
 struct TBEntry_pawn {
@@ -154,6 +171,24 @@ struct TBHashEntry {
 };
 
 int probe_tb(int *pieces, int *pos, int wtm, bitboard occ, int alpha, int beta);
+
+#ifdef MAKRUK
+// Raw index of Makruk pawnless tables: white king mirrored to files a-d,
+// 11 bits for both kings, 6 bits for each other piece.
+#define MK_RAW_SIZE(n) (2048ULL << (6 * ((n) - 2)))
+
+static inline uint64_t mk_raw_index(int *pos, int n, int flip)
+{
+  int mirror = ((pos[0] ^ flip) & 0x04) ? 0x07 : 0;
+  int wk = pos[0] ^ flip ^ mirror;
+  uint64_t idx = ((wk >> 3) << 2) | (wk & 0x03);
+  for (int i = 1; i < n; i++)
+    idx = (idx << 6) | (pos[i] ^ flip ^ mirror);
+  return idx;
+}
+
+int probe_dtz_makruk(int *pieces, int *gpos, int wtm);
+#endif
 
 uint64_t encode_piece(struct TBEntry_piece *ptr, uint8_t *norm, int *pos,
     uint64_t *factor);
