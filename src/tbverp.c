@@ -86,6 +86,8 @@ static int pcs2[MAX_PIECES];
 #include "atbverp.c"
 #elif defined(LOSER)
 #include "ltbverp.c"
+#elif defined(MAKRUK)
+#include "mtbverp.c"
 #elif defined(SHATRANJ)
 #include "jtbverp.c"
 #endif
@@ -289,7 +291,11 @@ int main(int argc, char **argv)
       pcs[KNIGHT | color]++;
       pt[j++] = KNIGHT | color;
       break;
+#ifndef MAKRUK
     case 'B':
+#else
+    case 'S':
+#endif
       pcs[BISHOP | color]++;
       pt[j++] = BISHOP | color;
       break;
@@ -297,7 +303,11 @@ int main(int argc, char **argv)
       pcs[ROOK | color]++;
       pt[j++] = ROOK | color;
       break;
+#ifndef MAKRUK
     case 'Q':
+#else
+    case 'M':
+#endif
       pcs[QUEEN | color]++;
       pt[j++] = QUEEN | color;
       break;

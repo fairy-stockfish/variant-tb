@@ -162,12 +162,19 @@ in `src/probe.h` is the reference implementation.
 ## Tools
 
 * `mtbgen KRSvKN` generates a pawnless table, `mtbgenp KRPvKR` a pawnful
-  table (`make makruk` builds both, `mprobe` and `tbcheck`). Option
+  table (`make makruk` builds both, the verifiers, `mprobe` and
+  `tbcheck`). Option
   `-t n` sets the number of threads.
 * `src/run_makruk.py --max 5 --threads 4` generates all tables up to the
   given number of pieces in dependency order (stronger side as white).
 * `mprobe` reads FENs (Makruk letters, only board and side to move are
   used) from stdin and prints the WDL value and `D`.
+* `mtbver KRSvKN` / `mtbverp KRPvKR` verify every position of a table
+  against all its successors (the subtables must be present). `mtbver` is
+  an independent implementation of the rules; `mtbverp` is derived from
+  the Shatranj verifier and cannot handle pawnful tables with symmetric
+  material (e.g. KPvKP), like the chess verifier. `run_makruk.py --verify`
+  verifies each table after generating it.
 * `src/mktest.py TABLE...` checks random positions of the given tables:
   it recomputes each stored value from the stored values of all successor
   positions with an independent Python implementation of the rules and of
@@ -216,4 +223,4 @@ khon (≈ 12 GB each) and is uncertain by a factor of 2–3.
   larger than chess DTZ files (e.g. 22 MB for KRNvKM, 69 MB for KSMvKM).
   Tables with a khon only have the mirror symmetry and dominate the total
   size.
-* There is no `mtbver`; `tbcheck` verifies the embedded checksums.
+* KPvKP can only be checked with `mktest.py` (random positions).

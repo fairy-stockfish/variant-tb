@@ -150,6 +150,15 @@ static void decomp_setup_pieces_piece(struct tb_handle *H, uint64_t *tb_size)
 
   for (i = 0; i < numpcs; i++)
     entry->pieces[0][i] = data[i + 1] & 0x0f;
+#ifdef MAKRUK
+  // raw index, see MAKRUK.md
+  (void)order;
+  tb_size[0] = tb_size[1] = MK_RAW_SIZE(numpcs);
+  if (H->split) {
+    for (i = 0; i < numpcs; i++)
+      entry->pieces[1][i] = data[i + 1] >> 4;
+  } else {
+#else
   order = data[0] & 0x0f;
   entry->order[0] = order;
   set_norm_piece(entry, entry->norm[0], entry->pieces[0], order);
@@ -163,6 +172,7 @@ static void decomp_setup_pieces_piece(struct tb_handle *H, uint64_t *tb_size)
     set_norm_piece(entry, entry->norm[1], entry->pieces[1], order);
     tb_size[1] = calc_factors_piece(entry->factor[1], entry->num, order, entry->norm[1], entry->enc_type);
   } else {
+#endif
     for (i = 0; i < numpcs; i++) {
       entry->pieces[1][i] = entry->pieces[0][i] ^ 0x08;
       entry->factor[1][i] = entry->factor[0][i];

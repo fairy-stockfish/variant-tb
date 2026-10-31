@@ -55,6 +55,8 @@ def main():
     ap.add_argument("--bindir", default="", help="directory of mtbgen/mtbgenp")
     ap.add_argument("--list", action="store_true", help="only list the tables")
     ap.add_argument("--stats", help="append resource usage per table to this CSV file")
+    ap.add_argument("--verify", action="store_true",
+                    help="verify each table with mtbver/mtbverp after generating it")
     ap.add_argument("--only", nargs="+", metavar="TABLE",
                     help="process only these tables, in the given order")
     args = ap.parse_args()
@@ -66,24 +68,51 @@ def main():
             continue
         if Path(tb + ".mkz").exists():
             continue
-        prog = "mtbgenp" if "P" in tb else "mtbgen"
-        cmd = [os.path.join(args.bindir, prog), "-t", str(args.threads), tb]
-        print("$ " + " ".join(cmd), flush=True)
-        t0 = time.time()
-        proc = subprocess.Popen(cmd)
-        _, status, ru = os.wait4(proc.pid, 0)
-        proc.returncode = os.waitstatus_to_exitcode(status)
-        if proc.returncode != 0:
+        pawns = "P" in tb
+        prog = "mtbgenp" if pawns else "mtbgen"
+        wall, cpu, rss = run(args, [prog, "-t", str(args.threads), tb])
+        if wall is None:
             raise SystemExit("Generating %s failed" % tb)
+        vwall = vcpu = ""
+        verified = ""
+        if args.verify:
+            if pawns and is_symmetric(tb):
+                # the pawnful verifier cannot handle symmetric material
+                verified = "skipped"
+            else:
+                prog = "mtbverp" if pawns else "mtbver"
+                vwall, vcpu, _ = run(args, [prog, "-t", str(args.threads), tb])
+                if vwall is None:
+                    raise SystemExit("Verifying %s failed" % tb)
+                verified = "ok"
+                vwall, vcpu = "%.1f" % vwall, "%.1f" % vcpu
         if args.stats:
             new = not Path(args.stats).exists()
             with open(args.stats, "a") as f:
                 if new:
-                    f.write("table,pieces,wall_s,cpu_s,maxrss_mb,wdl_bytes,dtz_bytes\n")
-                f.write("%s,%d,%.1f,%.1f,%.1f,%d,%d\n" % (
-                    tb, len(tb) - 1, time.time() - t0, ru.ru_utime + ru.ru_stime,
-                    ru.ru_maxrss / 1024, Path(tb + ".mkw").stat().st_size,
-                    Path(tb + ".mkz").stat().st_size))
+                    f.write("table,pieces,wall_s,cpu_s,maxrss_mb,wdl_bytes,"
+                            "dtz_bytes,verified,verify_wall_s,verify_cpu_s\n")
+                f.write("%s,%d,%.1f,%.1f,%.1f,%d,%d,%s,%s,%s\n" % (
+                    tb, len(tb) - 1, wall, cpu, rss,
+                    Path(tb + ".mkw").stat().st_size,
+                    Path(tb + ".mkz").stat().st_size, verified, vwall, vcpu))
+
+
+def is_symmetric(tb):
+    w, b = tb.split("v")
+    return w == b
+
+
+def run(args, cmd):
+    """Run a tool; returns (wall s, cpu s, peak rss MB), or Nones on failure."""
+    cmd[0] = os.path.join(args.bindir, cmd[0])
+    print("$ " + " ".join(cmd), flush=True)
+    t0 = time.time()
+    proc = subprocess.Popen(cmd)
+    _, status, ru = os.wait4(proc.pid, 0)
+    if os.waitstatus_to_exitcode(status) != 0:
+        return None, None, None
+    return time.time() - t0, ru.ru_utime + ru.ru_stime, ru.ru_maxrss / 1024
 
 
 if __name__ == "__main__":

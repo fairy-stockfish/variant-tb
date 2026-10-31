@@ -1,7 +1,7 @@
 GENTBNAME = mtbgen_unused
 GENTBPNAME = mtbgenp
 VERTBNAME = mtbver_unused
-VERTBPNAME = mtbverp_unused
+VERTBPNAME = mtbverp
 CLEAN = mclean
 
 DEPDIR = .depsm
@@ -13,12 +13,17 @@ include Makefile.general
 
 MGENTBOBJS = mtbgen.o compress.o huffman.o threads.o lz4.o checksum.o city-c.o util.o
 MPROBEOBJS = mprobe.o threads.o util.o
+MVERTBOBJS = mtbver.o decompress.o threads.o util.o
 
 include $(MGENTBOBJS:%.o=$(DEPDIR)/%.P)
 include $(MPROBEOBJS:%.o=$(DEPDIR)/%.P)
+include $(MVERTBOBJS:%.o=$(DEPDIR)/%.P)
 
 mtbgen: $(MGENTBOBJS)
 	$(CC) $(CFLAGS) -o mtbgen $(MGENTBOBJS:%=$(OBJDIR)/%) $(LDFLAGS)
 
 mprobe: $(MPROBEOBJS)
 	$(CC) $(CFLAGS) -o mprobe $(MPROBEOBJS:%=$(OBJDIR)/%) $(LDFLAGS)
+
+mtbver: $(MVERTBOBJS)
+	$(CC) $(CFLAGS) -o mtbver $(MVERTBOBJS:%=$(OBJDIR)/%) $(LDFLAGS)

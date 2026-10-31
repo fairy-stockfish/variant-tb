@@ -52,7 +52,7 @@ gtbgen gtbgenp gclean:
 jtbgen jtbgenp jtbver jtbverp jclean:
 	@$(MAKE) -f Makefile.shatranj $@
 
-mtbgen mtbgenp mprobe mclean:
+mtbgen mtbgenp mtbver mtbverp mprobe mclean:
 	@$(MAKE) -f Makefile.makruk $@
 
 #atbgen atbgenp atbver atbverp aclean:
@@ -64,11 +64,11 @@ giveaway: gtbgen gtbgenp tbcheck
 
 shatranj: jtbgen jtbgenp tbcheck
 
-makruk: mtbgen mtbgenp mprobe tbcheck
+makruk: mtbgen mtbgenp mtbver mtbverp mprobe tbcheck
 
 .PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean \
 	atbgen atbgenp atbver atbverp aclean \
 	stbgen stbgenp sclean \
 	gtbgen gtbgenp gclean \
 	jtbgen jtbgenp jtbver jtbverp jclean \
-	mtbgen mtbgenp mprobe mclean
+	mtbgen mtbgenp mtbver mtbverp mprobe mclean
