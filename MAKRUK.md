@@ -276,6 +276,13 @@ khon, 50 pawnful):
 | pawnless, khon (KSMvKM, KRSvKN) | 10–14 min | 1.8–1.9 GB | 104–138 MB |
 | pawnful (KSPvKM, KRPvKR, KMMvKP, KMPvKM, KMPvKP) | 5–9 min | 0.4–0.65 GB | 0.3–20 MB |
 
+Verification (`--verify`) costs somewhat more CPU time than generation:
+for the first 14 Makruk 5-piece tables 5700 s against 4100 s. A complete
+5-piece run of one variant including verification therefore takes roughly
+a day on 4 cores. An interrupted run of `run_makruk.py --verify --stats`
+can be resumed; tables that were generated but not verified are verified
+first.
+
 6 pieces cannot be measured on this machine. Estimates: pawnless tables
 need `3 · 2048 · 64^4` bytes ≈ 103 GB plus about 20% (measured ratio at 5
 pieces), pawnful tables about 16 GB with `-d` (as for chess). CPU time and
