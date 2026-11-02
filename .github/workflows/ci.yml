@@ -18,9 +18,7 @@ jobs:
           - variant: regular
             targets: rtbgen rtbgenp rtbver rtbverp tbcheck
           - variant: atomic
-            # atbgenp does not compile yet, so pawnful atomic tables are
-            # not tested (see tests/variant_test.py).
-            targets: atbgen atbver tbcheck
+            targets: atbgen atbgenp atbver atbverp tbcheck
           - variant: suicide
             targets: stbgen stbgenp tbcheck
           - variant: giveaway

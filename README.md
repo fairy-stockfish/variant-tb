@@ -18,7 +18,7 @@ the table below.
 | Variant  | Build target (`make -C src ...`) | Binaries | Table files | Path variable | Notes |
 |----------|----------------------------------|----------|-------------|---------------|-------|
 | [Chess](docs/variants/regular.md)    | `all`      | `rtbgen`, `rtbgenp`, `rtbver`, `rtbverp` | `.rtbw`/`.rtbz` | `RTBPATH` | Identical to upstream Syzygy tables. |
-| [Atomic](docs/variants/atomic.md)   | `atbgen atbver atbverp tbcheck` | `atbgen`, `atbgenp`, `atbver`, `atbverp` | `.atbw`/`.atbz` | `ATBPATH` | `atbgenp` (pawnful tables) currently does not compile. |
+| [Atomic](docs/variants/atomic.md)   | `atomic`   | `atbgen`, `atbgenp`, `atbver`, `atbverp` | `.atbw`/`.atbz` | `ATBPATH` | |
 | [Suicide](docs/variants/suicide.md)  | `suicide`  | `stbgen`, `stbgenp` | `.stbw`/`.stbz` | `STBPATH` | Losing chess, FICS stalemate rule. No verifier. |
 | [Giveaway](docs/variants/giveaway.md) | `giveaway` | `gtbgen`, `gtbgenp` | `.gtbw`/`.gtbz` | `GTBPATH` | Losing chess, antichess stalemate rule. No verifier. |
 | [Shatranj](docs/variants/shatranj.md) | `shatranj` | `jtbgen`, `jtbgenp`, `jtbver`, `jtbverp` | `.jtbw`/`.jtbz` | `JTBPATH` | 70-move rule, bare king loses. |
