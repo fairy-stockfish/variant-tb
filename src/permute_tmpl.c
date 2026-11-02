@@ -25,7 +25,7 @@ void NAME(convert_data_piece)(struct thread_data *thread)
   int sq2;
 #endif
   int n = entry_piece.num;
-  assume(n >= 3 && n <= TBPIECES);
+  assume(n >= MIN_TBPIECES && n <= TBPIECES);
   int pos[TBPIECES];
   int order[TBPIECES];
   uint64_t factor[TBPIECES];
@@ -108,7 +108,7 @@ void NAME(convert_data_pawn)(struct thread_data *thread)
   uint64_t idx1, idx2, idx3;
   int i;
   int n = entry_pawn.num;
-  assume(n >= 3 && n <= TBPIECES);
+  assume(n >= MIN_TBPIECES && n <= TBPIECES);
   int pos[TBPIECES];
   int order[TBPIECES];
   uint64_t factor[TBPIECES];
@@ -166,7 +166,7 @@ void NAME(convert_est_data_piece)(struct thread_data *thread)
   T *restrict v = NAME(permute_v);
   uint64_t idx;
   int n = entry_piece.num;
-  assume(n >= 3 && n <= TBPIECES);
+  assume(n >= MIN_TBPIECES && n <= TBPIECES);
   int sq;
 #ifdef SMALL
   int sq2;
@@ -273,7 +273,7 @@ void NAME(convert_est_data_pawn)(struct thread_data *thread)
   int file = NAME(est_data).file;
   uint64_t idx;
   int n = entry_pawn.num;
-  assume(n >= 3 && n <= TBPIECES);
+  assume(n >= MIN_TBPIECES && n <= TBPIECES);
   int pos[TBPIECES];
   uint64_t factor[TBPIECES];
   int order[TBPIECES];
