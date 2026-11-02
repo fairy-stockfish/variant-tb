@@ -2,23 +2,16 @@
 
 [![CI](https://github.com/fairy-stockfish/variant-tb/actions/workflows/ci.yml/badge.svg)](https://github.com/fairy-stockfish/variant-tb/actions/workflows/ci.yml)
 
-**variant-tb** is a long-term fork of Ronald de Man's Syzygy tablebase
+**variant-tb** is a fork of Ronald de Man's Syzygy tablebase
 generator ([syzygy1/tb](https://github.com/syzygy1/tb)) that extends it with
 support for more chess variants. Its main purpose is to generate endgame
 tablebases that can be used by
 [Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish).
 
-The relationship to upstream is the same as that of Fairy-Stockfish to
-Stockfish: this repository has its own `master` branch that is free to
-diverge from upstream, while useful upstream changes are merged in from time
-to time. Bugs that also affect upstream (in particular the regular chess
-generator) should preferably be reported and fixed there.
-
 The original upstream documentation follows below the variant-specific
 sections; unless stated otherwise it applies to all variants, with the
 binary names, file suffixes and environment variables replaced as listed in
 the table below.
-
 
 ### Supported variants
 
