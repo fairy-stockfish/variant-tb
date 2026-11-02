@@ -804,6 +804,12 @@ static void compress_data_single_valued(struct tb_handle *F, int num)
     F->flags[num] = dtz_map->side | 0x80
                           | (dtz_map->ply_accurate_win << 2)
                           | (dtz_map->ply_accurate_loss << 3);
+    // The single stored value is 0. Unless 0 decodes to the right DTZ value
+    // by itself, the map has to be stored so that 0 is mapped to the actual
+    // value (e.g. a table in which all wins have DTZ 3 or 4).
+    for (i = 0; i < 4; i++)
+      if (dtz_map->num[i] > 0 && dtz_map->map[i][0] != 0)
+        F->flags[num] |= 2 | (dtz_map->wide << 4);
   }
 }
 
