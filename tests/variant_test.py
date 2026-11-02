@@ -47,6 +47,7 @@ class Variant:
     verify: bool = True        # verifier binaries exist
     pawns: bool = True         # pawnful generator works
     bare_king_tables: bool = True  # KXvK tables exist (not in shatranj)
+    color_symmetry: bool = True    # KXvKY also covers KYvKX
 
 
 VARIANTS = {
@@ -59,6 +60,10 @@ VARIANTS = {
     # Bare king loses in shatranj, so the smallest tables have 4 pieces.
     "shatranj": Variant("j", "jtb", "JTBPATH", True, 4, 4,
                         bare_king_tables=False),
+    # Racing kings has no pawns, and white and black material cannot be
+    # swapped, so e.g. KRvK and KvKR are separate tables.
+    "racing":   Variant("k", "ktb", "KTBPATH", True, 3, 3, pawns=False,
+                        color_symmetry=False),
     # Misere chess: the checkmated side wins. 4-piece tables are included
     # so that both sides can be checkmated.
     "misere":   Variant("m", "mtb", "MTBPATH", True, 3, 4),
@@ -72,19 +77,21 @@ def order(pieces):
 def canonical_tables(v: Variant, npieces: int):
     """Canonical table names with npieces pieces (same naming as probe.c):
     side with more pieces first, pieces of each side in KQRBNP order and,
-    for equal piece counts, the lexicographically smaller side first."""
+    for equal piece counts, the lexicographically smaller side first.
+    Without color symmetry, white is always the first side."""
     names = set()
     if v.royal_king:
         others = npieces - 2
         for nw in range(others, -1, -1):
             nb = others - nw
-            if nw < nb:
+            if nw < nb and v.color_symmetry:
                 continue
             if nb == 0 and not v.bare_king_tables:
                 continue
             for w in combinations_with_replacement(PIECES[1:], nw):
                 for b in combinations_with_replacement(PIECES[1:], nb):
-                    if nw == nb and order(w) > order(b):
+                    if (nw == nb and order(w) > order(b)
+                            and v.color_symmetry):
                         continue
                     names.add("K" + "".join(w) + "vK" + "".join(b))
     else:

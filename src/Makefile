@@ -52,6 +52,9 @@ gtbgen gtbgenp gclean:
 jtbgen jtbgenp jtbver jtbverp jclean:
 	@$(MAKE) -f Makefile.shatranj $@
 
+ktbgen ktbver kclean:
+	@$(MAKE) -f Makefile.racing $@
+
 mtbgen mtbgenp mtbver mtbverp mclean:
 	@$(MAKE) -f Makefile.misere $@
 
@@ -64,6 +67,8 @@ giveaway: gtbgen gtbgenp tbcheck
 
 shatranj: jtbgen jtbgenp tbcheck
 
+racing: ktbgen ktbver tbcheck
+
 misere: mtbgen mtbgenp mtbver mtbverp tbcheck
 
 .PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean \
@@ -71,4 +76,5 @@ misere: mtbgen mtbgenp mtbver mtbverp tbcheck
 	stbgen stbgenp sclean \
 	gtbgen gtbgenp gclean \
 	jtbgen jtbgenp jtbver jtbverp jclean \
+	ktbgen ktbver kclean \
 	mtbgen mtbgenp mtbver mtbverp mclean

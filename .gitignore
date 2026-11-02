@@ -3,12 +3,12 @@
 *.swp
 *.txt
 !tests/checksums/*.txt
-*.[rasgjlm]tb[wz]
+*.[rasgjlkm]tb[wz]
 objs*/
 .deps*/
-[rasgjlm]tbgen
-[rasgjlm]tbgenp
-[rasgjlm]tbver
-[rasgjlm]tbverp
+[rasgjlkm]tbgen
+[rasgjlkm]tbgenp
+[rasgjlkm]tbver
+[rasgjlkm]tbverp
 tbcheck
 __pycache__/
