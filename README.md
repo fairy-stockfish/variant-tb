@@ -245,6 +245,30 @@ Only treat tablebases with at most n pieces.
 Use this option to generate 6-piece tables on a system with 16 GB of RAM.
 
 
+### Misère chess
+
+The generator can also produce tables for misère chess: all rules are
+those of regular chess (including the 50-move rule and stalemate being a
+draw), except that the side that is checkmated **wins**.
+
+Build with `make misere` (or `make mtbgen mtbgenp`). This produces:
+* mtbgen for generating pawnless misère tablebases.
+* mtbgenp for generating pawnful misère tablebases.
+
+Usage and options are the same as for rtbgen and rtbgenp. The resulting
+files have the suffixes .mtbw and .mtbz. Subtables are looked up in the
+directories listed in **$MTBPATH**, statistics are written to
+**$MTBSTATSDIR**.
+
+In the WDL tables a checkmated position is stored as a win for the side
+to move. A move that checkmates the opponent is a loss with DTZ = -1.
+The DTZ value stored for a checkmated position itself is not meaningful
+(the game is already over); probing code should detect checkmate before
+probing DTZ.
+
+There is no verifier for misère tables yet.
+
+
 ### Adding tablebase support to your program
 See here:
 https://github.com/syzygy1/probetool
