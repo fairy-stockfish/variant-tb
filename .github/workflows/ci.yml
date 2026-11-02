@@ -27,6 +27,12 @@ jobs:
             targets: gtbgen gtbgenp tbcheck
           - variant: shatranj
             targets: jtbgen jtbgenp jtbver jtbverp tbcheck
+          - variant: makruk
+            targets: mtbgen mtbgenp mtbver mtbverp tbcheck
+          - variant: cambodian
+            targets: cmtbgen cmtbver tbcheck
+          - variant: asean
+            targets: astbgen astbgenp astbver astbverp tbcheck
 
     steps:
       - uses: actions/checkout@v4

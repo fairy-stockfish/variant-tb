@@ -441,5 +441,7 @@ int main(int argc, char **argv)
 
   printf("%s: %s (%"PRIu64" errors)\n", tablename, errors ? "FAILED" : "OK",
       errors);
+  if (!errors)
+    printf("No errors.\n");
   return errors ? 1 : 0;
 }

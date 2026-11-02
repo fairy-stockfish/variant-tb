@@ -47,6 +47,10 @@ class Variant:
     verify: bool = True        # verifier binaries exist
     pawns: bool = True         # pawnful generator works
     bare_king_tables: bool = True  # KXvK tables exist (not in shatranj)
+    pieces: str = PIECES       # piece letters, in the order used in names
+    pawnful_suffix: str = "p"  # pawnful tables use <prefix>tbgen<suffix>
+    # the pawnful verifier also handles symmetric material (e.g. KPvKP)
+    verify_symmetric_pawnful: bool = False
 
 
 VARIANTS = {
@@ -59,17 +63,25 @@ VARIANTS = {
     # Bare king loses in shatranj, so the smallest tables have 4 pieces.
     "shatranj": Variant("j", "jtb", "JTBPATH", True, 4, 4,
                         bare_king_tables=False),
+    # Makruk family (see MAKRUK.md): S is the khon, M the met.
+    "makruk":   Variant("m", "mk", "MKTBPATH", True, 3, 3, pieces="KRSNMP"),
+    # All Cambodian tables, also those with pawns, are generated and
+    # verified by cmtbgen/cmtbver.
+    "cambodian": Variant("cm", "cm", "CMTBPATH", True, 3, 3, pieces="KRSNMP",
+                         pawnful_suffix="", verify_symmetric_pawnful=True),
+    "asean":    Variant("as", "as", "ASTBPATH", True, 3, 3, pieces="KRSNMP"),
 }
 
 
-def order(pieces):
-    return [PIECES.index(c) for c in pieces]
+def order(v, pieces):
+    return [v.pieces.index(c) for c in pieces]
 
 
 def canonical_tables(v: Variant, npieces: int):
     """Canonical table names with npieces pieces (same naming as probe.c):
-    side with more pieces first, pieces of each side in KQRBNP order and,
-    for equal piece counts, the lexicographically smaller side first."""
+    side with more pieces first, pieces of each side in the variant's piece
+    order (KQRBNP for chess) and, for equal piece counts, the
+    lexicographically smaller side first."""
     names = set()
     if v.royal_king:
         others = npieces - 2
@@ -79,9 +91,9 @@ def canonical_tables(v: Variant, npieces: int):
                 continue
             if nb == 0 and not v.bare_king_tables:
                 continue
-            for w in combinations_with_replacement(PIECES[1:], nw):
-                for b in combinations_with_replacement(PIECES[1:], nb):
-                    if nw == nb and order(w) > order(b):
+            for w in combinations_with_replacement(v.pieces[1:], nw):
+                for b in combinations_with_replacement(v.pieces[1:], nb):
+                    if nw == nb and order(v, w) > order(v, b):
                         continue
                     names.add("K" + "".join(w) + "vK" + "".join(b))
     else:
@@ -90,9 +102,9 @@ def canonical_tables(v: Variant, npieces: int):
             nb = npieces - nw
             if nb < 1 or nw < nb:
                 continue
-            for w in combinations_with_replacement(PIECES, nw):
-                for b in combinations_with_replacement(PIECES, nb):
-                    if nw == nb and order(w) > order(b):
+            for w in combinations_with_replacement(v.pieces, nw):
+                for b in combinations_with_replacement(v.pieces, nb):
+                    if nw == nb and order(v, w) > order(v, b):
                         continue
                     names.add("".join(w) + "v" + "".join(b))
     if not v.pawns:
@@ -158,7 +170,7 @@ def main():
         pawnful = "P" in tb
         files = [f"{tb}.{v.suffix}w", f"{tb}.{v.suffix}z"]
 
-        rc, out = run([binary("genp" if pawnful else "gen"),
+        rc, out = run([binary("gen" + (v.pawnful_suffix if pawnful else "")),
                        "-t", str(args.threads), tb], workdir, env)
         missing = [f for f in files if not (workdir / f).exists()]
         if rc != 0 or missing:
@@ -167,8 +179,9 @@ def main():
             continue
         status = "generated"
 
-        if v.verify and not (pawnful and is_symmetric(tb)):
-            rc, out = run([binary("verp" if pawnful else "ver"),
+        if v.verify and not (pawnful and is_symmetric(tb)
+                             and not v.verify_symmetric_pawnful):
+            rc, out = run([binary("ver" + (v.pawnful_suffix if pawnful else "")),
                            "-t", str(args.threads), tb], workdir, env)
             if rc != 0 or "No errors." not in out:
                 failures.append(f"{tb}: verification failed (rc={rc})")
