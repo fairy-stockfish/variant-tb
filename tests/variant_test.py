@@ -59,6 +59,9 @@ VARIANTS = {
     # Bare king loses in shatranj, so the smallest tables have 4 pieces.
     "shatranj": Variant("j", "jtb", "JTBPATH", True, 4, 4,
                         bare_king_tables=False),
+    # Misere chess: the checkmated side wins. 4-piece tables are included
+    # so that both sides can be checkmated.
+    "misere":   Variant("m", "mtb", "MTBPATH", True, 3, 4),
 }
 
 

@@ -22,6 +22,7 @@ the table below.
 | Suicide  | `suicide`  | `stbgen`, `stbgenp` | `.stbw`/`.stbz` | `STBPATH` | Losing chess, FICS rules (stalemate: side with fewer pieces wins). No verifier. |
 | Giveaway | `giveaway` | `gtbgen`, `gtbgenp` | `.gtbw`/`.gtbz` | `GTBPATH` | Losing chess, stalemated side wins (antichess). No verifier. |
 | Shatranj | `shatranj` | `jtbgen`, `jtbgenp`, `jtbver`, `jtbverp` | `.jtbw`/`.jtbz` | `JTBPATH` | 70-move rule, bare king loses. `Q` denotes the ferz, `B` the alfil. |
+| Misère   | `misere`   | `mtbgen`, `mtbgenp`, `mtbver`, `mtbverp` | `.mtbw`/`.mtbz` | `MTBPATH` | Chess rules, but the checkmated side wins. See [Misère chess](#misère-chess). |
 
 All variants use `tbcheck` (built by every target) to check the embedded
 checksums. Statistics are written to `$<X>TBSTATSDIR` and verification logs
@@ -34,6 +35,21 @@ in parallel with each other (e.g. `make -j atomic suicide`), because the
 sub-makes of one variant share their object directory.
 
 
+### Misère chess
+
+All rules are those of regular chess (including the 50-move rule and
+stalemate being a draw), except that the side that is checkmated **wins**.
+The misère binaries are built from the regular chess code with
+`-DREGULAR -DMISERE` and are used exactly like their chess counterparts.
+
+In the WDL tables a checkmated position is stored as a win for the side to
+move, and a move that checkmates the opponent is a loss with DTZ = -1. The
+DTZ value stored for a checkmated position itself is not meaningful (the
+game is already over; it is stored like a win with DTZ = 1), so probing code
+should detect checkmate before probing DTZ. Up to four pieces practically
+all positions are draws: only checkmate positions themselves are wins.
+
+
 ### Continuous integration
 
 Every push and pull request runs `.github/workflows/ci.yml`. For each
@@ -42,7 +58,9 @@ which
 
 1. generates all tables of the smallest sizes (3 pieces for chess and atomic,
    2 and 3 pieces for suicide and giveaway, 4 pieces for shatranj, where bare
-   king tables do not exist) in dependency order,
+   king tables do not exist, 3 and 4 pieces for misère chess, so that both
+   sides can be checkmated and captures lead into checkmates) in dependency
+   order,
 2. verifies them with the variant's verifier, where one exists,
 3. checks the checksum embedded in every file with `tbcheck`, and
 4. compares these checksums against the reference list in
@@ -243,33 +261,6 @@ Only treat tablebases with at most n pieces.
 
 --disk  
 Use this option to generate 6-piece tables on a system with 16 GB of RAM.
-
-
-### Misère chess
-
-The generator can also produce tables for misère chess: all rules are
-those of regular chess (including the 50-move rule and stalemate being a
-draw), except that the side that is checkmated **wins**.
-
-Build with `make misere` (or `make mtbgen mtbgenp mtbver mtbverp`). This
-produces:
-* mtbgen for generating pawnless misère tablebases.
-* mtbgenp for generating pawnful misère tablebases.
-* mtbver for verifying pawnless misère tablebases.
-* mtbverp for verifying pawnful misère tablebases.
-
-Usage and options are the same as for rtbgen, rtbgenp, rtbver and rtbverp
-(including the restriction that pawnful tables with symmetric material such
-as KPvKP cannot be verified). The resulting
-files have the suffixes .mtbw and .mtbz. Subtables are looked up in the
-directories listed in **$MTBPATH**, statistics are written to
-**$MTBSTATSDIR**.
-
-In the WDL tables a checkmated position is stored as a win for the side
-to move. A move that checkmates the opponent is a loss with DTZ = -1.
-The DTZ value stored for a checkmated position itself is not meaningful
-(the game is already over; it is stored like a win with DTZ = 1); probing
-code should detect checkmate before probing DTZ.
 
 
 ### Adding tablebase support to your program
