@@ -1205,7 +1205,7 @@ static void reset_pivot_captures(struct thread_data *thread)
   }
 }
 
-static void reset_piece_captures(void)
+static void reset_piece_captures_w(void)
 {
   int i, j, k;
   int n = numpcs;
@@ -1221,7 +1221,7 @@ static void reset_piece_captures(void)
     for (i = 0; i <= REDUCE_PLY_RED + 1; i++)
       v[LOSS_IN_ONE - i] = 1;
 
-  to_fix_w = to_fix_b = 0;
+  to_fix_w = 0;
 
   for (i = 0; i < n; i++) { // loop over black pieces
     if (!(pt[i] & 0x08) || i == black_king) continue;
@@ -1240,6 +1240,25 @@ static void reset_piece_captures(void)
     } else
       run_threaded(reset_pivot_captures, work_piv, 1);
   }
+}
+
+static void reset_piece_captures_b(void)
+{
+  int i, j, k;
+  int n = numpcs;
+  uint8_t *v = reset_v;
+
+  for (i = 0; i < 256; i++)
+    v[i] = 0;
+
+  if (num_saves == 0)
+    for (i = DRAW_RULE; i < REDUCE_PLY; i++)
+      v[LOSS_IN_ONE - i] = 1;
+  else
+    for (i = 0; i <= REDUCE_PLY_RED + 1; i++)
+      v[LOSS_IN_ONE - i] = 1;
+
+  to_fix_b = 0;
 
   for (i = 0; i < n; i++) { // loop over white pieces
     if ((pt[i] & 0x08) || i == white_king) continue;
@@ -1356,7 +1375,7 @@ static int compute_capt_closs(int *pcs, uint64_t idx0, uint8_t *table,
   return best;
 }
 
-static void fix_closs_w(struct thread_data *thread)
+static void fix_closs_worker_w(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
 
@@ -1368,7 +1387,7 @@ static void fix_closs_w(struct thread_data *thread)
   }
 }
 
-static void fix_closs_b(struct thread_data *thread)
+static void fix_closs_worker_b(struct thread_data *thread)
 {
   BEGIN_ITER_ALL;
 
@@ -1380,11 +1399,9 @@ static void fix_closs_b(struct thread_data *thread)
   }
 }
 
-static void fix_closs(void)
+static void init_win_loss_closs(void)
 {
   int i;
-
-  if (!to_fix_w && !to_fix_b && !cursed_pawn_capt_w && !cursed_pawn_capt_b) return;
 
   for (i = 0; i < 256; i++)
     win_loss[i] = 0;
@@ -1403,13 +1420,22 @@ static void fix_closs(void)
     for (i = 0; i < REDUCE_PLY_RED; i++)
       win_loss[CAPT_CWIN_RED + i + 2] = LOSS_IN_ONE - i - 1;
   }
+}
 
-  if (to_fix_w || cursed_pawn_capt_w) {
-    printf("fixing cursed white losses.\n");
-    run_threaded(fix_closs_w, work_g, 1);
-  }
-  if (to_fix_b || cursed_pawn_capt_b) {
-    printf("fixing cursed black losses.\n");
-    run_threaded(fix_closs_b, work_g, 1);
-  }
+static void fix_closs_w(void)
+{
+  if (!to_fix_w && !cursed_pawn_capt_w) return;
+
+  init_win_loss_closs();
+  printf("fixing cursed white losses.\n");
+  run_threaded(fix_closs_worker_w, work_g, 1);
+}
+
+static void fix_closs_b(void)
+{
+  if (!to_fix_b && !cursed_pawn_capt_b) return;
+
+  init_win_loss_closs();
+  printf("fixing cursed black losses.\n");
+  run_threaded(fix_closs_worker_b, work_g, 1);
 }
