@@ -516,7 +516,7 @@ static void calc_captures_w(void)
   }
 
   for (i = 0; i < n; i++) { // loop over black pieces
-    if (!(pt[i] & 0x08) || i == black_king) continue;
+    if (!(pt[i] & BLACK_BIT) || i == black_king) continue;
     for (k = 0, j = 0; black_all[k] >= 0; k++)
       if (black_all[k] != i)
         pcs2[j++] = black_all[k];
@@ -544,7 +544,7 @@ static void calc_captures_b(void)
   }
 
   for (i = 0; i < n; i++) { // loop over white pieces
-    if ((pt[i] & 0x08) || i == white_king) continue;
+    if ((pt[i] & BLACK_BIT) || i == white_king) continue;
     for (k = 0, j = 0; white_all[k] >= 0; k++)
       if (white_all[k] != i)
         pcs2[j++] = white_all[k];
@@ -787,9 +787,9 @@ static int probe_pawn_capt(int k, int sq, uint64_t idx, int king, int clr,
       int sq2 = FirstOne(bits);
       int t;
       for (t = 0; p[t] != sq2; t++);
-      if ((pt[t] & 0x08) == clr) continue;
+      if ((pt[t] & BLACK_BIT) == clr) continue;
       for (i = 0, m = 0; i < numpcs; i++)
-        if (i != t && ((pt[i] & 0x08) != clr))
+        if (i != t && ((pt[i] & BLACK_BIT) != clr))
           pcs[m++] = i;
       pcs[m] = -1;
       if (is_attacked(p[king], pcs, occ, p)) continue;
@@ -808,9 +808,9 @@ static int probe_pawn_capt(int k, int sq, uint64_t idx, int king, int clr,
       int sq2 = FirstOne(bits);
       int t;
       for (t = 0; p[t] != sq2; t++);
-      if ((pt[t] & 0x08) == clr) continue;
+      if ((pt[t] & BLACK_BIT) == clr) continue;
       for (i = 0, m = 0; i < numpcs; i++)
-        if (i != t && (pt[i] & 0x08) != clr)
+        if (i != t && (pt[i] & BLACK_BIT) != clr)
           pcs[m++] = i;
       pcs[m] = -1;
       if (is_attacked(p[king], pcs, occ, p)) continue;
@@ -821,8 +821,8 @@ static int probe_pawn_capt(int k, int sq, uint64_t idx, int king, int clr,
       pt2[t] = 0;
       pos[k] = sq2;
       if (best < -2) best = -2;
-      for (m = QUEEN; m >= KNIGHT; m--) {
-        pt2[k] = m | (pt[k] & 0x08);
+      PROMO_LOOP(m, 0) {
+        pt2[k] = m | (pt[k] & BLACK_BIT);
         v = -probe_tb(pt2, pos, wtm, occ, -2, -best);
         if (v > 1) return v;
         if (v > best) best = v;
@@ -873,7 +873,7 @@ static void calc_pawn_captures_b(struct thread_data *thread)
     int v = -4;
     for (i = 0; i < numpawns; i++) {
       if (pw[i]) continue; // loop through black pawns
-      int val = probe_pawn_capt(i, p[i] - 0x08, idx & ~mask[i], black_king, 8, 1, occ & ~bit[p[i]], p);
+      int val = probe_pawn_capt(i, p[i] - 0x08, idx & ~mask[i], black_king, BLACK_BIT, 1, occ & ~bit[p[i]], p);
       if (val > v) v = val;
     }
     has_cursed |= wdl_to_cursed[v + 4];
@@ -900,7 +900,7 @@ static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm,
     pt2[i] = pt[i];
   pt2[k] = 0;
   for (i = 0, m = 0; i < numpcs; i++)
-    if (i != k && (pt[i] & 0x08) != clr)
+    if (i != k && (pt[i] & BLACK_BIT) != clr)
       pcs[m++] = i;
   pcs[m] = -1;
   v = 3;
@@ -966,7 +966,7 @@ static void calc_pawn_moves_w(struct thread_data *thread)
         }
         pos[i] = sq + 8;
         if (best < -2) best = -2;
-        for (k = WQUEEN; k >= WKNIGHT; k--) {
+        PROMO_LOOP(k, 0) {
           pt2[i] = k;
           int v = -probe_tb(pt2, pos, 0, bb, -2, -best);
           if (v > best) {
@@ -989,7 +989,7 @@ static void calc_pawn_moves_w(struct thread_data *thread)
             int sq2 = FirstOne(bits);
             for (k = 0; p[k] != sq2; k++);
             if (pt[k] == BPAWN) {
-              v0 = eval_ep(i, k, sq2, p[i] + 0x08, black_king, 8, 1, occ, p);
+              v0 = eval_ep(i, k, sq2, p[i] + 0x08, black_king, BLACK_BIT, 1, occ, p);
               if (v0 < v1) v1 = v0;
             }
             ClearFirst(bits);
@@ -1047,7 +1047,7 @@ static void calc_pawn_moves_b(struct thread_data *thread)
         }
         pos[i] = sq - 8;
         if (best < -2) best = -2;
-        for (k = BQUEEN; k >= BKNIGHT; k--) {
+        PROMO_LOOP(k, BLACK_BIT) {
           pt2[i] = k;
           int v = -probe_tb(pt2, pos, 1, bb, -2, -best);
           if (v > best) {
@@ -1174,7 +1174,7 @@ static void reset_piece_captures_w(void)
   to_fix_w = 0;
 
   for (i = 0; i < n; i++) { // loop over black pieces
-    if (!(pt[i] & 0x08) || i == black_king) continue;
+    if (!(pt[i] & BLACK_BIT) || i == black_king) continue;
     if (!(cursed_capt[i] & 2)) continue;
     if (!to_fix_w) {
       printf("Resetting white cursed losses.\n");
@@ -1211,7 +1211,7 @@ static void reset_piece_captures_b(void)
   to_fix_b = 0;
 
   for (i = 0; i < n; i++) { // loop over white pieces
-    if ((pt[i] & 0x08) || i == white_king) continue;
+    if ((pt[i] & BLACK_BIT) || i == white_king) continue;
     if (!(cursed_capt[i] & 2)) continue;
     if (!to_fix_b) {
       printf("Resetting black cursed losses.\n");
@@ -1245,7 +1245,7 @@ static int test_pawn_capt(int k, int sq, uint64_t idx, uint8_t *restrict table,
       int sq2 = FirstOne(bits);
       int t;
       for (t = 0; p[t] != sq2; t++);
-      if ((pt[t] & 0x08) == clr) continue;
+      if ((pt[t] & BLACK_BIT) == clr) continue;
       for (i = 0; i < numpcs; i++) {
         pos[i] = p[i];
         pt2[i] = pt[i];
@@ -1253,7 +1253,7 @@ static int test_pawn_capt(int k, int sq, uint64_t idx, uint8_t *restrict table,
       pos[k] = sq2;
       pt2[t] = 0;
       for (i = 0, m = 0; i < numpcs; i++)
-        if (i != t && ((pt[i] & 0x08) != clr))
+        if (i != t && ((pt[i] & BLACK_BIT) != clr))
           pcs[m++] = i;
       pcs[m] = -1;
       if (!is_attacked(p[king], pcs, occ, p)
@@ -1265,9 +1265,9 @@ static int test_pawn_capt(int k, int sq, uint64_t idx, uint8_t *restrict table,
       int sq2 = FirstOne(bits);
       int t;
       for (t = 0; p[t] != sq2; t++);
-      if ((pt[t] & 0x08) == clr) continue;
+      if ((pt[t] & BLACK_BIT) == clr) continue;
       for (i = 0, m = 0; i < numpcs; i++)
-        if (i != t && (pt[i] & 0x08) != clr)
+        if (i != t && (pt[i] & BLACK_BIT) != clr)
           pcs[m++] = i;
       pcs[m] = -1;
       if (is_attacked(p[king], pcs, occ, p)) continue;
@@ -1277,8 +1277,8 @@ static int test_pawn_capt(int k, int sq, uint64_t idx, uint8_t *restrict table,
       }
       pt2[t] = 0;
       pos[k] = sq2;
-      for (m = QUEEN; m >= KNIGHT; m--) {
-        pt2[k] = m | (pt[k] & 0x08);
+      PROMO_LOOP(m, 0) {
+        pt2[k] = m | (pt[k] & BLACK_BIT);
         if (probe_tb(pt2, pos, wtm, occ, 1, 2) <= 1)
           return 1;
       }
@@ -1316,7 +1316,7 @@ static void reset_pawn_captures_b(struct thread_data *thread)
     FILL_OCC;
     for (i = 0; i < numpawns; i++) {
       if (pw[i]) continue; // loop through black pawns
-      if (test_pawn_capt(i, p[i] - 0x08, idx & ~mask[i], table_w, black_king, 8, 1, occ & ~bit[p[i]], p)) {
+      if (test_pawn_capt(i, p[i] - 0x08, idx & ~mask[i], table_w, black_king, BLACK_BIT, 1, occ & ~bit[p[i]], p)) {
         table_b[idx] = CAPT_CLOSS;
         break;
       }

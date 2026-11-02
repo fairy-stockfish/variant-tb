@@ -4,7 +4,14 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
+#ifndef SCHESS
 static char pc[] = { 0, 'P', 'N', 'B', 'R', 'Q', 'K', 0, 0, 'p', 'n', 'b', 'r', 'q', 'k', 0};
+#else
+static char pc[NUM_PC] = {
+  0, 'P', 'N', 'B', 'R', 'Q', 'K', 'H', 'E', 0, 0, 0, 0, 0, 0, 0,
+  0, 'p', 'n', 'b', 'r', 'q', 'k', 'h', 'e', 0, 0, 0, 0, 0, 0, 0
+};
+#endif
 
 static char fen_buf[128];
 

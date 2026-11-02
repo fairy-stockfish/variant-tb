@@ -70,7 +70,7 @@ extern int numpawns;
 extern int numpcs;
 
 static int pw[TBPIECES];
-int cmp[16];
+int cmp[NUM_PC];
 
 void setup_pieces(struct TBEntry_piece *ptr, uint8_t *data);
 
@@ -309,29 +309,29 @@ uint64_t init_permute_piece(int *pcs, int *pt)
 {
   int i, j, k, m, l;
   uint64_t factor[TBPIECES];
-  int tidx[16];
+  int tidx[NUM_PC];
 
-  for (i = 0, k = 0; i < 16; i++)
+  for (i = 0, k = 0; i < NUM_PC; i++)
     if (pcs[i]) type[k++] = i;
   num_types = k;
 
 #ifdef RACING
   entry_piece.enc_type = 1;
 #else
-  for (i = 0, k = 0; i < 16; i++)
+  for (i = 0, k = 0; i < NUM_PC; i++)
     if (pcs[i] == 1) k++;
   if (k >= 3) entry_piece.enc_type = 0;
   else if (k == 2) entry_piece.enc_type = 2;
   else { /* only possible for suicide chess */
     k = 16;
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < NUM_PC; i++)
       if (pcs[i] < k && pcs[i] > 1) k = pcs[i];
     entry_piece.enc_type = 1 + k;
   }
 #endif
 
   entry_piece.num = 0;
-  for (i = 0; i < 16; i++)
+  for (i = 0; i < NUM_PC; i++)
     entry_piece.num += pcs[i];
 
   generate_type_perms(num_types);
@@ -506,7 +506,7 @@ void permute_piece_wdl(u8 *tb_table, int *pcs, int *pt, u8 *table,
   estimate_compression_u8(table, &bestp, pcs, 1, -1);
 
   for (i = 0; i < entry_piece.num; i++)
-    best[i] = pt[piece_perm_list[bestp][i]];
+    best[i] = PC_TO_NIBBLE(pt[piece_perm_list[bestp][i]]);
   best[0] |= order_list[bestp] << 4;
 
   printf("best order: %d", best[0] >> 4);
@@ -526,7 +526,7 @@ void permute_piece_wdl(u8 *tb_table, int *pcs, int *pt, u8 *table,
 void init_permute_pawn(int *pcs, int *pt)
 {
   int i, j, j0, j1, k, m, l;
-  int tidx[16];
+  int tidx[NUM_PC];
   int pivtype;
 
   init_0x40(numpcs);
@@ -550,7 +550,7 @@ void init_permute_pawn(int *pcs, int *pt)
     sq_mask_pawn[i] ^= pw_mask;
   }
 
-  for (i = 0, k = 0; i < 16; i++)
+  for (i = 0, k = 0; i < NUM_PC; i++)
     if (pcs[i]) type[k++] = i;
   num_types = k;
 
@@ -564,7 +564,7 @@ void init_permute_pawn(int *pcs, int *pt)
   }
 
   entry_pawn.num = 0;
-  for (i = 0; i < 16; i++)
+  for (i = 0; i < NUM_PC; i++)
     entry_pawn.num += pcs[i];
 
   generate_type_perms(num_types);
@@ -579,21 +579,21 @@ void init_permute_pawn(int *pcs, int *pt)
     for (j0 = 0; j0 < num_types; j0++)
       if (type_perm_list[i][j0] == pivtype) break;
     for (j1 = 0; j1 < num_types; j1++)
-      if (type_perm_list[i][j1] == (pivtype ^ 0x08)) break;
+      if (type_perm_list[i][j1] == (pivtype ^ BLACK_BIT)) break;
     if (j1 == num_types) j1 = 0x0f;
     order_list[i] = j0;
     order2_list[i] = j1;
     for (m = 0; m < entry_pawn.pawns[0]; m++)
       piece_perm_list[i][m] = tidx[pivtype] + m;
     for (; m < entry_pawn.pawns[0] + entry_pawn.pawns[1]; m++)
-      piece_perm_list[i][m] = tidx[pivtype ^ 0x08] + (m - entry_pawn.pawns[0]);
+      piece_perm_list[i][m] = tidx[pivtype ^ BLACK_BIT] + (m - entry_pawn.pawns[0]);
     for (k = 0; k < num_types; k++)
       if (k != j0 && k != j1)
         for (l = 0; l < pcs[type_perm_list[i][k]]; l++)
           piece_perm_list[i][m++] = tidx[type_perm_list[i][k]] + l;
   }
 
-  for (i = 0; i < 16; i++)
+  for (i = 0; i < NUM_PC; i++)
     cmp[i] = pcs[i];
   cmp[WPAWN] = 13;
   cmp[BPAWN] = 14;
@@ -642,7 +642,7 @@ void permute_pawn_wdl(u8 *tb_table, int *pcs, int *pt, u8 *table,
   estimate_compression_u8(table, &bestp, pcs, 1, file);
 
   for (i = 0; i < entry_pawn.num; i++)
-    best[i] = pt[piece_perm_list[bestp][i]];
+    best[i] = PC_TO_NIBBLE(pt[piece_perm_list[bestp][i]]);
   best[0] |= order_list[bestp] << 4;
   best[1] |= order2_list[bestp] << 4;
 

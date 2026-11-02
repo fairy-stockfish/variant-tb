@@ -750,7 +750,7 @@ void calc_captures_w(void)
   run_threaded(calc_illegal_w, work_piv1, 1);
 
   for (i = 2; i < n; i++) { // loop over black pieces
-    if (!(pt[i] & 0x08)) continue;
+    if (!(pt[i] & BLACK_BIT)) continue;
     for (k = 0, j = 0; black_pcs[k] >= 0; k++)
       if (black_pcs[k] != i)
         pcs2[j++] = black_pcs[k];
@@ -768,7 +768,7 @@ void calc_captures_b(void)
   run_threaded(calc_illegal_b, work_piv0, 1);
 
   for (i = 2; i < n; i++) { // loop over white pieces
-    if (pt[i] & 0x08) continue;
+    if (pt[i] & BLACK_BIT) continue;
     for (k = 0, j = 0; white_pcs[k] >= 0; k++)
       if (white_pcs[k] != i)
         pcs2[j++] = white_pcs[k];

@@ -9,6 +9,11 @@
 
 #include <inttypes.h>
 
+// SCHESS (Seirawan chess without pieces in hand) is a variation on REGULAR
+#ifdef SCHESS
+#define REGULAR
+#endif
+
 #if defined(REGULAR) || defined(SHATRANJ) || defined(RACING)
 #define SMALL
 #endif

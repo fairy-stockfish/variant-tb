@@ -33,7 +33,6 @@ from itertools import combinations_with_replacement
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PIECES = "KQRBNP"
 
 
 @dataclass
@@ -48,6 +47,7 @@ class Variant:
     pawns: bool = True         # variant has pawns
     bare_king_tables: bool = True  # KXvK tables exist (not in shatranj)
     color_symmetry: bool = True    # KXvKY also covers KYvKX
+    pieces: str = "KQRBNP"         # piece letters in table name order
 
 
 VARIANTS = {
@@ -62,16 +62,21 @@ VARIANTS = {
     # swapped, so e.g. KRvK and KvKR are separate tables.
     "racing":   Variant("k", "ktb", "KTBPATH", True, 3, 3, pawns=False,
                         color_symmetry=False),
+    # Seirawan chess without pieces in hand: chess plus hawk (H) and
+    # elephant (E).
+    "schess":   Variant("e", "etb", "ETBPATH", True, 3, 3,
+                        pieces="KQEHRBNP"),
 }
 
 
-def order(pieces):
-    return [PIECES.index(c) for c in pieces]
+def order(v: Variant, pieces):
+    return [v.pieces.index(c) for c in pieces]
 
 
 def canonical_tables(v: Variant, npieces: int):
     """Canonical table names with npieces pieces (same naming as probe.c):
-    side with more pieces first, pieces of each side in KQRBNP order and,
+    side with more pieces first, pieces of each side in the order of
+    v.pieces (KQRBNP for chess) and,
     for equal piece counts, the lexicographically smaller side first.
     Without color symmetry, white is always the first side."""
     names = set()
@@ -83,9 +88,9 @@ def canonical_tables(v: Variant, npieces: int):
                 continue
             if nb == 0 and not v.bare_king_tables:
                 continue
-            for w in combinations_with_replacement(PIECES[1:], nw):
-                for b in combinations_with_replacement(PIECES[1:], nb):
-                    if (nw == nb and order(w) > order(b)
+            for w in combinations_with_replacement(v.pieces[1:], nw):
+                for b in combinations_with_replacement(v.pieces[1:], nb):
+                    if (nw == nb and order(v, w) > order(v, b)
                             and v.color_symmetry):
                         continue
                     names.add("K" + "".join(w) + "vK" + "".join(b))
@@ -95,9 +100,9 @@ def canonical_tables(v: Variant, npieces: int):
             nb = npieces - nw
             if nb < 1 or nw < nb:
                 continue
-            for w in combinations_with_replacement(PIECES, nw):
-                for b in combinations_with_replacement(PIECES, nb):
-                    if nw == nb and order(w) > order(b):
+            for w in combinations_with_replacement(v.pieces, nw):
+                for b in combinations_with_replacement(v.pieces, nb):
+                    if nw == nb and order(v, w) > order(v, b):
                         continue
                     names.add("".join(w) + "v" + "".join(b))
     if not v.pawns:

@@ -1,0 +1,12 @@
+GENTBNAME = etbgen
+GENTBPNAME = etbgenp
+VERTBNAME = etbver
+VERTBPNAME = etbverp
+CLEAN = eclean
+
+DEPDIR = .depse
+OBJDIR = objse
+
+FLAGS += -DSCHESS
+
+include Makefile.general

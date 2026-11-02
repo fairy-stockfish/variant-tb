@@ -57,6 +57,12 @@
 #define TBPATH "JTBPATH"
 #define STATSDIR "JTBSTATSDIR"
 #define LOGFILE "jtblog.txt"
+#elif defined(SCHESS)
+#define WDLSUFFIX ".etbw"
+#define DTZSUFFIX ".etbz"
+#define TBPATH "ETBPATH"
+#define STATSDIR "ETBSTATSDIR"
+#define LOGFILE "etblog.txt"
 #else
 #define WDLSUFFIX ".rtbw"
 #define DTZSUFFIX ".rtbz"
@@ -67,7 +73,10 @@
 
 #define MAX_TBPIECES 8
 
-#if defined(REGULAR)
+#if defined(SCHESS)
+#define WDL_MAGIC 0x7e19c2a5
+#define DTZ_MAGIC 0xd3b8475e
+#elif defined(REGULAR)
 #define WDL_MAGIC 0x5d23e871
 #define DTZ_MAGIC 0xa50c66d7
 #elif defined(ATOMIC)
@@ -89,7 +98,9 @@
 #define OTHER_MAGIC 0x1593f67b
 #endif
 
-#if defined(SUICIDE) || defined(RACING)
+#if defined(SCHESS)
+#define TBHASHBITS 13
+#elif defined(SUICIDE) || defined(RACING)
 #define TBHASHBITS 12
 #else
 #define TBHASHBITS 10

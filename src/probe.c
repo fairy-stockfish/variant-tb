@@ -37,6 +37,10 @@
 #define TBMAX_PIECE 1300
 #define TBMAX_PAWN 1
 #define HSHMAX 16
+#elif defined(SCHESS)
+#define TBMAX_PIECE 3110
+#define TBMAX_PAWN 2730
+#define HSHMAX 16
 #elif defined(SHATRANJ)
 #define TBMAX_PIECE 590
 #define TBMAX_PAWN 570
@@ -57,8 +61,37 @@
 #define CONNECTED_KINGS
 #endif
 
-#if defined(REGULAR) || defined(ATOMIC) || defined(LOSER) || defined(SHATRANJ) \
-    || defined(RACING)
+#if defined(SCHESS)
+// One nibble per piece type: white P, N, B, R, Q, H, E in nibbles 0-6 and
+// black P, N, B, R, Q, H, E in nibbles 7-13. The top byte is random.
+uint64_t tb_piece_key[] = {
+  0ULL,
+  0x5c00000000000001ULL, // P
+  0xe100000000000010ULL, // N
+  0xd600000000000100ULL, // B
+  0xab00000000001000ULL, // R
+  0x6800000000010000ULL, // Q
+  0x0000000000000000ULL, // K
+  0x3900000000100000ULL, // H
+  0x9700000001000000ULL, // E
+  0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
+  0ULL,
+  0xf200000010000000ULL, // p
+  0xbb00000100000000ULL, // n
+  0x5800001000000000ULL, // b
+  0xa100010000000000ULL, // r
+  0x7c00100000000000ULL, // q
+  0x0000000000000000ULL, // k
+  0x4e01000000000000ULL, // h
+  0xc510000000000000ULL, // e
+  0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL
+};
+
+#define WHITEMATMASK 0x000000000fffffff
+#define BLACKMATMASK 0x00fffffff0000000
+#define NUM_KEY_TYPES 7
+#elif defined(REGULAR) || defined(ATOMIC) || defined(LOSER) \
+    || defined(SHATRANJ) || defined(RACING)
 uint64_t tb_piece_key[] = {
   0ULL,
   0x5ced000000000001ULL,
@@ -80,6 +113,7 @@ uint64_t tb_piece_key[] = {
 
 #define WHITEMATMASK 0x00000000000fffff
 #define BLACKMATMASK 0x000000fffff00000
+#define NUM_KEY_TYPES 5
 #else
 uint64_t tb_piece_key[] = {
   0ULL,
@@ -102,6 +136,23 @@ uint64_t tb_piece_key[] = {
 
 #define WHITEMATMASK 0x0000000000ffffff
 #define BLACKMATMASK 0x0000ffffff000000
+#define NUM_KEY_TYPES 6
+#endif
+
+// Piece type counted in nibble i of the material key.
+#ifdef SCHESS
+static const int key_type[NUM_KEY_TYPES] = {
+  PAWN, KNIGHT, BISHOP, ROOK, QUEEN, HAWK, ELEPHANT
+};
+#endif
+
+// Bucket of a material key in the hash table.
+#ifdef SCHESS
+// The material key has only 8 random bits, so mix all its bits.
+#define TB_HASH_IDX(key) \
+  (((key) * 0x9e3779b97f4a7c15ULL) >> (64 - TBHASHBITS))
+#else
+#define TB_HASH_IDX(key) ((key) >> (64 - TBHASHBITS))
 #endif
 
 #define Swap(a,b) {int tmp=a;a=b;b=tmp;}
@@ -139,7 +190,7 @@ void add_to_hash(struct TBEntry *ptr, uint64_t key)
 {
   int i, hshidx;
 
-  hshidx = key >> (64 - TBHASHBITS);
+  hshidx = TB_HASH_IDX(key);
   i = 0;
   while (i < HSHMAX && TB_hash[hshidx][i].ptr)
     i++;
@@ -152,12 +203,17 @@ void add_to_hash(struct TBEntry *ptr, uint64_t key)
   }
 }
 
+#ifndef SCHESS
 static char pchr[] = {'K', 'Q', 'R', 'B', 'N', 'P'};
+#else
+static char pchr[] = {'K', 'Q', 'E', 'H', 'R', 'B', 'N', 'P'};
+#endif
+#define NUM_PCHR ((int)sizeof(pchr))
 
 static void init_tb(char *str)
 {
   struct TBEntry *entry;
-  int i, j, pcs[16];
+  int i, j, pcs[NUM_PC];
   uint64_t key, key2;
   int color;
 
@@ -165,7 +221,7 @@ static void init_tb(char *str)
   if (fd == FD_ERR) return;
   close_file(fd);
 
-  for (i = 0; i < 16; i++)
+  for (i = 0; i < NUM_PC; i++)
     pcs[i] = 0;
   color = 0;
   for (i = 0; i < strlen(str); i++)
@@ -185,20 +241,27 @@ static void init_tb(char *str)
     case 'Q':
       pcs[QUEEN | color]++;
       break;
+#ifdef SCHESS
+    case 'H':
+      pcs[HAWK | color]++;
+      break;
+    case 'E':
+      pcs[ELEPHANT | color]++;
+      break;
+#endif
     case 'K':
       pcs[KING | color]++;
       break;
     case 'v':
-      color = 0x08;
+      color = BLACK_BIT;
       break;
     }
-  for (i = 0; i < 8; i++)
-    if (pcs[i] != pcs[i+8])
-      break;
   key = key2 = 0;
-  for (i = 0; i < 6; i++) {
-    key += (tb_piece_key[i+1]*pcs[i+1]) + (tb_piece_key[i+9]*pcs[i+9]);
-    key2 += (tb_piece_key[i+1]*pcs[i+9]) + (tb_piece_key[i+9]*pcs[i+1]);
+  for (i = 1; i < BLACK_BIT; i++) {
+    key += (tb_piece_key[i]*pcs[i])
+          + (tb_piece_key[i|BLACK_BIT]*pcs[i|BLACK_BIT]);
+    key2 += (tb_piece_key[i]*pcs[i|BLACK_BIT])
+          + (tb_piece_key[i|BLACK_BIT]*pcs[i]);
   }
   if (pcs[WPAWN] + pcs[BPAWN] == 0) {
     if (TBnum_piece == TBMAX_PIECE) {
@@ -216,7 +279,7 @@ static void init_tb(char *str)
   entry->key = (uint32_t)key;
   entry->ready = 0;
   entry->num = 0;
-  for (i = 0; i < 16; i++)
+  for (i = 0; i < NUM_PC; i++)
     entry->num += pcs[i];
 #ifndef RACING
   entry->symmetric = (key == key2);
@@ -240,13 +303,13 @@ static void init_tb(char *str)
     (void)j;
     ptr->enc_type = 1;
 #else
-    for (i = 0, j = 0; i < 16; i++)
+    for (i = 0, j = 0; i < NUM_PC; i++)
       if (pcs[i] == 1) j++;
     if (j >= 3) ptr->enc_type = 0;
     else if (j == 2) ptr->enc_type = 2;
     else { /* only for suicide */
       j = 16;
-      for (i = 0; i < 16; i++) {
+      for (i = 0; i < NUM_PC; i++) {
         if (pcs[i] < j && pcs[i] > 1) j = pcs[i];
         ptr->enc_type = 1 + j;
       }
@@ -419,64 +482,64 @@ void init_tablebases(void)
             }
 #else
 #ifndef SHATRANJ
-  for (i = 1; i < 6; i++) {
+  for (i = 1; i < NUM_PCHR; i++) {
     sprintf(str, "K%cvK", pchr[i]);
     init_tb(str);
   }
 #endif
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++) {
+  for (i = 1; i < NUM_PCHR; i++)
+    for (j = i; j < NUM_PCHR; j++) {
       sprintf(str, "K%cvK%c", pchr[i], pchr[j]);
       init_tb(str);
     }
 
 #ifndef SHATRANJ
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++) {
+  for (i = 1; i < NUM_PCHR; i++)
+    for (j = i; j < NUM_PCHR; j++) {
       sprintf(str, "K%c%cvK", pchr[i], pchr[j]);
       init_tb(str);
     }
 #endif
 
 #ifndef SHATRANJ
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++) {
+  for (i = 1; i < NUM_PCHR; i++)
+    for (j = i; j < NUM_PCHR; j++)
+      for (k = j; k < NUM_PCHR; k++) {
         sprintf(str, "K%c%c%cvK", pchr[i], pchr[j], pchr[k]);
         init_tb(str);
       }
 #endif
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = 1; k < 6; k++) {
+  for (i = 1; i < NUM_PCHR; i++)
+    for (j = i; j < NUM_PCHR; j++)
+      for (k = 1; k < NUM_PCHR; k++) {
         sprintf(str, "K%c%cvK%c", pchr[i], pchr[j], pchr[k]);
         init_tb(str);
       }
 
 #ifndef SHATRANJ
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = k; l < 6; l++) {
+  for (i = 1; i < NUM_PCHR; i++)
+    for (j = i; j < NUM_PCHR; j++)
+      for (k = j; k < NUM_PCHR; k++)
+        for (l = k; l < NUM_PCHR; l++) {
           sprintf(str, "K%c%c%c%cvK", pchr[i], pchr[j], pchr[k], pchr[l]);
           init_tb(str);
         }
 #endif
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = 0; l < 6; l++) {
+  for (i = 1; i < NUM_PCHR; i++)
+    for (j = i; j < NUM_PCHR; j++)
+      for (k = j; k < NUM_PCHR; k++)
+        for (l = 0; l < NUM_PCHR; l++) {
           sprintf(str, "K%c%c%cvK%c", pchr[i], pchr[j], pchr[k], pchr[l]);
           init_tb(str);
         }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = i; k < 6; k++)
-        for (l = (i == k) ? j : k; l < 6; l++) {
+  for (i = 1; i < NUM_PCHR; i++)
+    for (j = i; j < NUM_PCHR; j++)
+      for (k = i; k < NUM_PCHR; k++)
+        for (l = (i == k) ? j : k; l < NUM_PCHR; l++) {
           sprintf(str, "K%c%cvK%c%c", pchr[i], pchr[j], pchr[k], pchr[l]);
           init_tb(str);
         }
@@ -484,32 +547,32 @@ void init_tablebases(void)
 #if TBPIECES == 7
 
 #ifndef SHATRANJ
-  for (i = 1; i < 6; i ++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = k; l < 6; l++)
-          for (m = l; m < 6; m++) {
+  for (i = 1; i < NUM_PCHR; i ++)
+    for (j = i; j < NUM_PCHR; j++)
+      for (k = j; k < NUM_PCHR; k++)
+        for (l = k; l < NUM_PCHR; l++)
+          for (m = l; m < NUM_PCHR; m++) {
             sprintf(str, "K%c%c%c%c%cvK", pchr[i], pchr[j], pchr[k],
                                           pchr[l], pchr[m]);
             init_tb(str);
           }
 #endif
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = k; l < 6; l++)
-          for (m = 1; m < 6; m++) {
+  for (i = 1; i < NUM_PCHR; i++)
+    for (j = i; j < NUM_PCHR; j++)
+      for (k = j; k < NUM_PCHR; k++)
+        for (l = k; l < NUM_PCHR; l++)
+          for (m = 1; m < NUM_PCHR; m++) {
             sprintf(str, "K%c%c%c%cvK%c", pchr[i], pchr[j], pchr[k],
                                           pchr[l], pchr[m]);
             init_tb(str);
           }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = 1; l < 6; l++)
-          for (m = l; m < 6; m++) {
+  for (i = 1; i < NUM_PCHR; i++)
+    for (j = i; j < NUM_PCHR; j++)
+      for (k = j; k < NUM_PCHR; k++)
+        for (l = 1; l < NUM_PCHR; l++)
+          for (m = l; m < NUM_PCHR; m++) {
             sprintf(str, "K%c%c%cvK%c%c", pchr[i], pchr[j], pchr[k],
                                           pchr[l], pchr[m]);
             init_tb(str);
@@ -2064,14 +2127,14 @@ void setup_pieces_piece(struct TBEntry_piece *ptr, uint8_t *data,
   int order;
 
   for (i = 0; i < ptr->num; i++)
-    ptr->pieces[0][i] = data[i + 1] & 0x0f;
+    ptr->pieces[0][i] = NIBBLE_TO_PC(data[i + 1] & 0x0f);
   order = data[0] & 0x0f;
   ptr->order[0] = order;
   set_norm_piece(ptr, ptr->norm[0], ptr->pieces[0], order);
   tb_size[0] = calc_factors_piece(ptr->factor[0], ptr->num, order, ptr->norm[0], ptr->enc_type);
 
   for (i = 0; i < ptr->num; i++)
-    ptr->pieces[1][i] = data[i + 1] >> 4;
+    ptr->pieces[1][i] = NIBBLE_TO_PC(data[i + 1] >> 4);
   order = data[0] >> 4;
   ptr->order[1] = order;
   set_norm_piece(ptr, ptr->norm[1], ptr->pieces[1], order);
@@ -2088,7 +2151,7 @@ void setup_pieces_pawn(struct TBEntry_pawn *ptr, uint8_t *data,
   order = data[0] & 0x0f;
   order2 = ptr->pawns[1] ? (data[1] & 0x0f) : 0x0f;
   for (i = 0; i < ptr->num; i++)
-    ptr->file[f].pieces[0][i] = data[i + j] & 0x0f;
+    ptr->file[f].pieces[0][i] = NIBBLE_TO_PC(data[i + j] & 0x0f);
   ptr->file[f].order[0] = order;
   ptr->file[f].order2[0] = order2;
   set_norm_pawn(ptr, ptr->file[f].norm[0], ptr->file[f].pieces[0], order, order2);
@@ -2097,7 +2160,7 @@ void setup_pieces_pawn(struct TBEntry_pawn *ptr, uint8_t *data,
   order = data[0] >> 4;
   order2 = ptr->pawns[1] ? (data[1] >> 4) : 0x0f;
   for (i = 0; i < ptr->num; i++)
-    ptr->file[f].pieces[1][i] = data[i + j] >> 4;
+    ptr->file[f].pieces[1][i] = NIBBLE_TO_PC(data[i + j] >> 4);
   ptr->file[f].order[1] = order;
   ptr->file[f].order2[1] = order2;
   set_norm_pawn(ptr, ptr->file[f].norm[1], ptr->file[f].pieces[1], order, order2);
@@ -2266,6 +2329,7 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size,
 }
 #endif
 
+#ifndef SCHESS
 static char *prt_str(char *str, uint64_t key)
 {
   int i, k;
@@ -2276,6 +2340,20 @@ static char *prt_str(char *str, uint64_t key)
   }
   return str;
 }
+#else
+static char *prt_str(char *str, uint64_t key)
+{
+  // nibble of the material key for each of 'Q', 'E', 'H', 'R', 'B', 'N', 'P'
+  static const int nibble[] = { 4, 6, 5, 3, 2, 1, 0 };
+  int i, k;
+  for (i = 0; i < 7; i++) {
+    k = (key >> (4 * nibble[i])) & 0x0f;
+    while (k--)
+      *str++ = pchr[i + 1];
+  }
+  return str;
+}
+#endif
 
 static void init_table(struct TBEntry *entry, uint64_t key)
 {
@@ -2295,6 +2373,11 @@ static void init_table(struct TBEntry *entry, uint64_t key)
     key2 += tb_piece_key[i + 9] * (k1 & 0x0f);
   for (i = 0; i < 6; i++, k1 >>= 4)
     key2 += tb_piece_key[i + 1] * (k1 & 0x0f);
+#elif defined(SCHESS)
+  for (i = 0; i < NUM_KEY_TYPES; i++, k1 >>= 4)
+    key2 += tb_piece_key[key_type[i] | BLACK_BIT] * (k1 & 0x0f);
+  for (i = 0; i < NUM_KEY_TYPES; i++, k1 >>= 4)
+    key2 += tb_piece_key[key_type[i]] * (k1 & 0x0f);
 #else
   for (i = 0; i < 5; i++, k1 >>= 4)
     key2 += tb_piece_key[i + 9] * (k1 & 0x0f);
@@ -2304,11 +2387,7 @@ static void init_table(struct TBEntry *entry, uint64_t key)
 
   k1 = key & WHITEMATMASK;
   k2 = key & BLACKMATMASK;
-#if defined(SUICIDE)
-  k2 >>= 4 * 6;
-#else
-  k2 >>= 4 * 5;
-#endif
+  k2 >>= 4 * NUM_KEY_TYPES;
   if (entry->key != (uint32_t)key) {
     uint64_t tmp = k1;
     k1 = k2;
@@ -2689,7 +2768,7 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
   if (!key) return -2;
 #endif
 
-  ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
+  ptr2 = TB_hash[TB_HASH_IDX(key)];
   for (i = 0; i < HSHMAX; i++)
     if (ptr2[i].key == key) break;
   if (i == HSHMAX) {
@@ -2716,7 +2795,7 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
   int bside, mirror, cmirror;
   if (!ptr->symmetric) {
     if ((uint32_t)key != ptr->key) {
-      cmirror = 8;
+      cmirror = BLACK_BIT;
       mirror = 0x38;
       bside = wtm;
     } else {
@@ -2724,7 +2803,7 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
       bside = !wtm;
     }
   } else {
-    cmirror = wtm ? 0 : 8;
+    cmirror = wtm ? 0 : BLACK_BIT;
     mirror = wtm ? 0 : 0x38;
     bside = 0;
   }
@@ -2771,11 +2850,11 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
     for (i = 0; i < numpcs; i++) {
       if (i == black_king) continue;
       s = pieces[i];
-      if (!(s & 0x08)) continue;
+      if (!(s & BLACK_BIT)) continue;
       sq = gpos[i];     /* square of piece to be captured */
       for (j = 0; j < numpcs; j++) {
         t = pieces[j];
-        if (!t || (t & 0x08)) continue;
+        if (!t || (t & BLACK_BIT)) continue;
         sq2 = gpos[j];
         if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
 // alternatively, change pieces around
@@ -2787,14 +2866,14 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
         bb = occ & ~bit[sq2];
         for (k = 0; k < numpcs; k++) {
           t = pieces[k];
-          if (!(t & 0x08)) continue;
+          if (!(t & BLACK_BIT)) continue;
           int sq3 = gpos[k];
           if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
         }
         if (k == numpcs) {
           if (pieces[j] == WPAWN && gpos[j] >= 0x38) {
             int m;
-            for (m = WQUEEN; m >= WKNIGHT; m--) {
+            PROMO_LOOP(m, 0) {
               pieces[j] = m;
               int v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
               if (v > alpha) {
@@ -2819,11 +2898,11 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
     for (i = 0; i < numpcs; i++) {
       if (i == white_king) continue;
       s = pieces[i];
-      if (!s || (s & 0x08)) continue;
+      if (!s || (s & BLACK_BIT)) continue;
       sq = gpos[i];     /* square of piece to be captured */
       for (j = 0; j < numpcs; j++) {
         t = pieces[j];
-        if (!(t & 0x08)) continue;
+        if (!(t & BLACK_BIT)) continue;
         sq2 = gpos[j];
         if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
 // alternatively, change pieces around
@@ -2835,14 +2914,14 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
         bb = occ & ~bit[sq2];
         for (k = 0; k < numpcs; k++) {
           t = pieces[k];
-          if (!t || (t & 0x08)) continue;
+          if (!t || (t & BLACK_BIT)) continue;
           int sq3 = gpos[k];
           if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
         }
         if (k == numpcs) {
           if (pieces[j] == BPAWN && gpos[j] < 0x08) {
             int m;
-            for (m = BQUEEN; m >= BKNIGHT; m--) {
+            PROMO_LOOP(m, BLACK_BIT) {
               pieces[j] = m;
               int v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
               if (v > alpha) {
@@ -3518,7 +3597,7 @@ int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
           capts = 1;
           if (pieces[j] == WPAWN && gpos[j] >= 0x38) {
             int m;
-            for (m = WQUEEN; m >= WKNIGHT; m--) {
+            PROMO_LOOP(m, 0) {
               pieces[j] = m;
               int v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
               if (v > alpha) {
@@ -3567,7 +3646,7 @@ int probe_tb(int *pieces, int *gpos, int wtm, bitboard occ, int alpha, int beta)
           capts = 1;
           if (pieces[j] == BPAWN && gpos[j] < 0x08) {
             int m;
-            for (m = BQUEEN; m >= BKNIGHT; m--) {
+            PROMO_LOOP(m, BLACK_BIT) {
               pieces[j] = m;
               int v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
               if (v > alpha) {
@@ -3601,6 +3680,7 @@ static __attribute__ ((noinline)) void probe_failed(int *pieces)
   char str[32];
 
   LOCK(fail_mutex);
+#ifndef SCHESS
   k = 0;
   for (i = 0; i < 6; i++)
     for (j = 0; j < numpcs; j++)
@@ -3611,6 +3691,21 @@ static __attribute__ ((noinline)) void probe_failed(int *pieces)
     for (j = 0; j < numpcs; j++)
       if (pieces[j] == BKING - i)
         str[k++] = pchr[i];
+#else
+  static const int pchr_type[] = {
+    KING, QUEEN, ELEPHANT, HAWK, ROOK, BISHOP, KNIGHT, PAWN
+  };
+  k = 0;
+  for (i = 0; i < NUM_PCHR; i++)
+    for (j = 0; j < numpcs; j++)
+      if (pieces[j] == pchr_type[i])
+        str[k++] = pchr[i];
+  str[k++] = 'v';
+  for (i = 0; i < NUM_PCHR; i++)
+    for (j = 0; j < numpcs; j++)
+      if (pieces[j] == (pchr_type[i] | BLACK_BIT))
+        str[k++] = pchr[i];
+#endif
   str[k] = 0;
   fprintf(stderr, "Missing table: %s\n", str);
   fprintf(stderr, "Did you set "TBPATH" correctly?\n");

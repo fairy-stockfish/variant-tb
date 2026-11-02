@@ -35,13 +35,13 @@ void decomp_init_piece(int *pcs)
   (void)i; (void)k;
   enc_type = 1;
 #else
-  for (i = 0, k = 0; i < 16; i++)
+  for (i = 0, k = 0; i < NUM_PC; i++)
     if (pcs[i] == 1) k++;
   if (k >= 3) enc_type = 0;
   else if (k == 2) enc_type = 2;
   else { /* only possible for suicide */
     k = 16;
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < NUM_PC; i++)
       if (pcs[i] < k && pcs[i] > 1) k = pcs[i];
     enc_type = 1 + k;
   }
@@ -154,7 +154,7 @@ static void decomp_setup_pieces_piece(struct tb_handle *H, uint64_t *tb_size)
   entry->enc_type = enc_type;
 
   for (i = 0; i < numpcs; i++)
-    entry->pieces[0][i] = data[i + 1] & 0x0f;
+    entry->pieces[0][i] = NIBBLE_TO_PC(data[i + 1] & 0x0f);
   order = data[0] & 0x0f;
   entry->order[0] = order;
   set_norm_piece(entry, entry->norm[0], entry->pieces[0], order);
@@ -162,14 +162,14 @@ static void decomp_setup_pieces_piece(struct tb_handle *H, uint64_t *tb_size)
 
   if (H->split) {
     for (i = 0; i < numpcs; i++)
-      entry->pieces[1][i] = data[i + 1] >> 4;
+      entry->pieces[1][i] = NIBBLE_TO_PC(data[i + 1] >> 4);
     order = data[0] >> 4;
     entry->order[1] = order;
     set_norm_piece(entry, entry->norm[1], entry->pieces[1], order);
     tb_size[1] = calc_factors_piece(entry->factor[1], entry->num, order, entry->norm[1], entry->enc_type);
   } else {
     for (i = 0; i < numpcs; i++) {
-      entry->pieces[1][i] = entry->pieces[0][i] ^ 0x08;
+      entry->pieces[1][i] = entry->pieces[0][i] ^ BLACK_BIT;
       entry->factor[1][i] = entry->factor[0][i];
       entry->norm[1][i] = entry->norm[0][i];
     }
@@ -195,7 +195,7 @@ void decomp_setup_pieces_pawn(struct tb_handle *H, uint64_t *tb_size, int f)
   order = data[0] & 0x0f;
   order2 = entry->pawns[1] ? (data[1] & 0x0f) : 0x0f;
   for (i = 0; i < entry->num; i++)
-    entry->file[f].pieces[0][i] = data[i + j] & 0x0f;
+    entry->file[f].pieces[0][i] = NIBBLE_TO_PC(data[i + j] & 0x0f);
   entry->file[f].order[0] = order;
   entry->file[f].order2[0] = order2;
   set_norm_pawn(entry, entry->file[f].norm[0], entry->file[f].pieces[0], order, order2);
@@ -205,14 +205,14 @@ void decomp_setup_pieces_pawn(struct tb_handle *H, uint64_t *tb_size, int f)
     order = data[0] >> 4;
     order2 = entry->pawns[1] ? (data[1] >> 4) : 0x0f0;
     for (i = 0; i < entry->num; i++)
-      entry->file[f].pieces[1][i] = data[i + j] >> 4;
+      entry->file[f].pieces[1][i] = NIBBLE_TO_PC(data[i + j] >> 4);
     entry->file[f].order[1] = order;
     entry->file[f].order2[1] = order2;
     set_norm_pawn(entry, entry->file[f].norm[1], entry->file[f].pieces[1], order, order2);
     tb_size[1] = calc_factors_pawn(entry->file[f].factor[1], entry->num, order, order2, entry->file[f].norm[1], f);
   } else {
     for (i = 0; i < numpcs; i++) {
-      entry->file[f].pieces[1][i] = entry->file[f].pieces[0][i] ^ 0x08;
+      entry->file[f].pieces[1][i] = entry->file[f].pieces[0][i] ^ BLACK_BIT;
       entry->file[f].factor[1][i] = entry->file[f].factor[0][i];
       entry->file[f].norm[1][i] = entry->file[f].norm[0][i];
     }
