@@ -19,8 +19,8 @@ the table below.
 |----------|----------------------------------|----------|-------------|---------------|-------|
 | [Chess](docs/variants/regular.md)    | `all`      | `rtbgen`, `rtbgenp`, `rtbver`, `rtbverp` | `.rtbw`/`.rtbz` | `RTBPATH` | Identical to upstream Syzygy tables. |
 | [Atomic](docs/variants/atomic.md)   | `atomic`   | `atbgen`, `atbgenp`, `atbver`, `atbverp` | `.atbw`/`.atbz` | `ATBPATH` | |
-| [Suicide](docs/variants/suicide.md)  | `suicide`  | `stbgen`, `stbgenp`, `stbver` | `.stbw`/`.stbz` | `STBPATH` | Losing chess, FICS stalemate rule. No pawnful verifier. |
-| [Giveaway](docs/variants/giveaway.md) | `giveaway` | `gtbgen`, `gtbgenp`, `gtbver` | `.gtbw`/`.gtbz` | `GTBPATH` | Losing chess, antichess stalemate rule. No pawnful verifier. |
+| [Suicide](docs/variants/suicide.md)  | `suicide`  | `stbgen`, `stbgenp`, `stbver`, `stbverp` | `.stbw`/`.stbz` | `STBPATH` | Losing chess, FICS stalemate rule. |
+| [Giveaway](docs/variants/giveaway.md) | `giveaway` | `gtbgen`, `gtbgenp`, `gtbver`, `gtbverp` | `.gtbw`/`.gtbz` | `GTBPATH` | Losing chess, antichess stalemate rule. |
 | [Shatranj](docs/variants/shatranj.md) | `shatranj` | `jtbgen`, `jtbgenp`, `jtbver`, `jtbverp` | `.jtbw`/`.jtbz` | `JTBPATH` | 70-move rule, bare king loses. |
 | [Racing Kings](docs/variants/racing-kings.md) | `racing` | `ktbgen`, `ktbver` | `.ktbw`/`.ktbz` | `KTBPATH` | No pawns, no color symmetry (`KRvK` and `KvKR` are separate tables). |
 

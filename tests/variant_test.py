@@ -45,7 +45,6 @@ class Variant:
     min_pieces: int    # default piece range tested in CI
     max_pieces: int
     verify: bool = True        # verifier binaries exist
-    verify_pawns: bool = True  # pawnful verifier exists
     pawns: bool = True         # variant has pawns
     bare_king_tables: bool = True  # KXvK tables exist (not in shatranj)
     color_symmetry: bool = True    # KXvKY also covers KYvKX
@@ -54,10 +53,8 @@ class Variant:
 VARIANTS = {
     "regular":  Variant("r", "rtb", "RTBPATH", True, 3, 3),
     "atomic":   Variant("a", "atb", "ATBPATH", True, 3, 3),
-    "suicide":  Variant("s", "stb", "STBPATH", False, 2, 3,
-                        verify_pawns=False),
-    "giveaway": Variant("g", "gtb", "GTBPATH", False, 2, 3,
-                        verify_pawns=False),
+    "suicide":  Variant("s", "stb", "STBPATH", False, 2, 3),
+    "giveaway": Variant("g", "gtb", "GTBPATH", False, 2, 3),
     # Bare king loses in shatranj, so the smallest tables have 4 pieces.
     "shatranj": Variant("j", "jtb", "JTBPATH", True, 4, 4,
                         bare_king_tables=False),
@@ -175,8 +172,7 @@ def main():
             continue
         status = "generated"
 
-        if v.verify and not (pawnful and (is_symmetric(tb)
-                                          or not v.verify_pawns)):
+        if v.verify and not (pawnful and is_symmetric(tb)):
             rc, out = run([binary("verp" if pawnful else "ver"),
                            "-t", str(args.threads), tb], workdir, env)
             if rc != 0 or "No errors." not in out:

@@ -699,8 +699,10 @@ void prepare_dtz_map_u8(uint8_t *v, struct dtz_map *map)
     else
       for (i = 2; i <= DRAW_RULE; i++)
         v[BASE_WIN + i] = inv_map[0][(i - 1) / 2];
+    // losses by stalemate (0 plies) and in 1 ply both have DTZ 0
+    v[BASE_LOSS] = v[BASE_LOSS - 1] = inv_map[1][0];
     if (map->ply_accurate_loss)
-      for (i = 0; i <= DRAW_RULE; i++)
+      for (i = 2; i <= DRAW_RULE; i++)
         v[BASE_LOSS - i] = inv_map[1][i - 1];
     else
       for (i = 2; i <= DRAW_RULE; i++)
@@ -788,8 +790,10 @@ void prepare_dtz_map_u16(uint16_t *v, struct dtz_map *map)
     else
       for (i = 2; i <= DRAW_RULE; i++)
         v[BASE_WIN + i] = inv_map[0][(i - 1) / 2];
+    // losses by stalemate (0 plies) and in 1 ply both have DTZ 0
+    v[BASE_LOSS] = v[BASE_LOSS - 1] = inv_map[1][0];
     if (map->ply_accurate_loss)
-      for (i = 0; i <= DRAW_RULE; i++)
+      for (i = 2; i <= DRAW_RULE; i++)
         v[BASE_LOSS - i] = inv_map[1][i - 1];
     else
       for (i = 2; i <= DRAW_RULE; i++)

@@ -471,6 +471,8 @@ int main(int argc, char **argv)
     if (pt[i] == BKING)
       black_king = i;
 #else
+#ifndef GIVEAWAY
+  // FICS rules (if stalemate, the player with less material wins)
   int stalemate = 0;
   for (i = 0; i < numpcs; i++)
     stalemate += (pt[i] & 0x08) ? 1 : -1;
@@ -482,6 +484,10 @@ int main(int argc, char **argv)
     stalemate_b = 2;
   } else
     stalemate_w = stalemate_b = 0;
+#else
+  // international rules (stalemated player wins)
+  stalemate_w = stalemate_b = 2;
+#endif
 
   last_w = -1;
   j = 0;
