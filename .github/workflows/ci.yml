@@ -20,9 +20,9 @@ jobs:
           - variant: atomic
             targets: atbgen atbgenp atbver atbverp tbcheck
           - variant: suicide
-            targets: stbgen stbgenp tbcheck
+            targets: stbgen stbgenp stbver tbcheck
           - variant: giveaway
-            targets: gtbgen gtbgenp tbcheck
+            targets: gtbgen gtbgenp gtbver tbcheck
           - variant: shatranj
             targets: jtbgen jtbgenp jtbver jtbverp tbcheck
           - variant: racing
