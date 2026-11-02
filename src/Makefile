@@ -43,10 +43,10 @@ rtbgen rtbgenp rtbver rtbverp tbcheck clean:
 atbgen atbgenp atbver atbverp aclean:
 	@$(MAKE) -f Makefile.atomic $@
 
-stbgen stbgenp sclean:
+stbgen stbgenp stbver stbverp sclean:
 	@$(MAKE) -f Makefile.suicide $@
 
-gtbgen gtbgenp gclean:
+gtbgen gtbgenp gtbver gtbverp gclean:
 	@$(MAKE) -f Makefile.giveaway $@
 
 jtbgen jtbgenp jtbver jtbverp jclean:
@@ -58,9 +58,9 @@ ktbgen ktbver kclean:
 #atbgen atbgenp atbver atbverp aclean:
 atomic: atbgen atbgenp atbver atbverp tbcheck
 
-suicide: stbgen stbgenp tbcheck
+suicide: stbgen stbgenp stbver stbverp tbcheck
 
-giveaway: gtbgen gtbgenp tbcheck
+giveaway: gtbgen gtbgenp gtbver gtbverp tbcheck
 
 shatranj: jtbgen jtbgenp tbcheck
 
@@ -68,7 +68,7 @@ racing: ktbgen ktbver tbcheck
 
 .PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean \
 	atbgen atbgenp atbver atbverp aclean \
-	stbgen stbgenp sclean \
-	gtbgen gtbgenp gclean \
+	stbgen stbgenp stbver stbverp sclean \
+	gtbgen gtbgenp gtbver gtbverp gclean \
 	jtbgen jtbgenp jtbver jtbverp jclean \
 	ktbgen ktbver kclean

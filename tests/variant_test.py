@@ -53,8 +53,8 @@ class Variant:
 VARIANTS = {
     "regular":  Variant("r", "rtb", "RTBPATH", True, 3, 3),
     "atomic":   Variant("a", "atb", "ATBPATH", True, 3, 3),
-    "suicide":  Variant("s", "stb", "STBPATH", False, 2, 3, verify=False),
-    "giveaway": Variant("g", "gtb", "GTBPATH", False, 2, 3, verify=False),
+    "suicide":  Variant("s", "stb", "STBPATH", False, 2, 3),
+    "giveaway": Variant("g", "gtb", "GTBPATH", False, 2, 3),
     # Bare king loses in shatranj, so the smallest tables have 4 pieces.
     "shatranj": Variant("j", "jtb", "JTBPATH", True, 4, 4,
                         bare_king_tables=False),
