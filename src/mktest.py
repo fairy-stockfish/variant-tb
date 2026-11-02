@@ -2,9 +2,9 @@
 """Consistency check of Makruk tablebases.
 
 Independent re-implementation of the Makruk rules and of the semantics
-described in MAKRUK.md. For random positions of a table the stored value is
-recomputed from the stored values of all successor positions (probed with
-mprobe) and compared.
+described in docs/variants/makruk.md. For random positions of a table the
+stored value is recomputed from the stored values of all successor
+positions (probed with mprobe) and compared.
 
 Usage: mktest.py [-n samples] [-s seed] TABLE...   (MKTBPATH must be set)
 """

@@ -1,6 +1,6 @@
 /*
   Counting rules of the Makruk family as implemented by Fairy-Stockfish
-  (Position::count_limit() and do_move()), see MAKRUK.md.
+  (Position::count_limit() and do_move()), see docs/variants/makruk.md.
 
   This file is distributed under the terms of the GNU GPL, version 2.
 */

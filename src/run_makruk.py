@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate Makruk, Cambodian or ASEAN tablebases (see MAKRUK.md) in
+Generate Makruk, Cambodian or ASEAN tablebases (see docs/variants/) in
 dependency order.
 
 Each material combination is generated once, with the stronger side as

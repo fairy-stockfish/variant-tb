@@ -10,8 +10,8 @@
 
   wdl is the WDL value for the side to move (pawnless tables: with a
   freshly started count). For pawnless positions (and for all Cambodian
-  positions) dtz is the signed distance D in plies (see MAKRUK.md), for
-  pawnful positions it is 0.
+  positions) dtz is the signed distance D in plies (see
+  docs/variants/makruk.md), for pawnful positions it is 0.
 */
 
 #include <stdio.h>

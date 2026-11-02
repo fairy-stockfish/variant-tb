@@ -3,13 +3,13 @@
 *.swp
 *.txt
 !tests/checksums/*.txt
-*.[rasgjl]tb[wz]
+*.[rasgjlk]tb[wz]
 objs*/
 .deps*/
-[rasgjl]tbgen
-[rasgjl]tbgenp
-[rasgjl]tbver
-[rasgjl]tbverp
+[rasgjlk]tbgen
+[rasgjlk]tbgenp
+[rasgjlk]tbver
+[rasgjlk]tbverp
 tbcheck
 __pycache__/
 # Makruk, Cambodian and ASEAN chess

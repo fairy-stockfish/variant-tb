@@ -63,6 +63,12 @@
 #define TBPATH "MKTBPATH"
 #define STATSDIR "MKTBSTATSDIR"
 #define LOGFILE "mktblog.txt"
+#elif defined(RACING)
+#define WDLSUFFIX ".ktbw"
+#define DTZSUFFIX ".ktbz"
+#define TBPATH "KTBPATH"
+#define STATSDIR "KTBSTATSDIR"
+#define LOGFILE "ktblog.txt"
 #elif defined(SHATRANJ)
 #define WDLSUFFIX ".jtbw"
 #define DTZSUFFIX ".jtbz"
@@ -94,6 +100,9 @@
 #elif defined(MAKRUK)
 #define WDL_MAGIC 0x3ac9d5e1
 #define DTZ_MAGIC 0x7b51e2c4
+#elif defined(RACING)
+#define WDL_MAGIC 0x6b4f2ad9
+#define DTZ_MAGIC 0x3c91e75b
 #elif defined(SHATRANJ)
 #define WDL_MAGIC 0xb4e9b3b7
 #define DTZ_MAGIC 0x87c126fc
@@ -107,7 +116,7 @@
 #define OTHER_MAGIC 0x1593f67b
 #endif
 
-#ifdef SUICIDE
+#if defined(SUICIDE) || defined(RACING)
 #define TBHASHBITS 12
 #else
 #define TBHASHBITS 10

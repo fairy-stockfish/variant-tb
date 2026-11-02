@@ -4,9 +4,9 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 
   The value of a pawnless Makruk position depends on the counting rules
-  (see MAKRUK.md). For every position we compute the counting distance D:
-  the number of plies the winning side needs to force either checkmate or
-  a capture that leaves the opponent with a bare king in a position that is
+  (see docs/variants/makruk.md). For every position we compute the
+  counting distance D: the number of plies the winning side needs to force
+  either checkmate or a capture that leaves the opponent with a bare king in a position that is
   won with a freshly started pieces' honour count. Captures that do not
   create a bare king do not reset the count, so D is measured across them
   (using the D values of the subtables).
@@ -18,8 +18,9 @@
   ASEAN (-DASEAN): the 50-move rule applies, so outside of bare king
   endings every capture resets the distance (as in Syzygy, see mkrules.h).
 
-  The index is the raw mirror-symmetric index described in MAKRUK.md: the
-  Khon only moves forward, so only left-right mirroring may be used.
+  The index is the raw mirror-symmetric index described in
+  docs/variants/makruk.md: the Khon only moves forward, so only left-right
+  mirroring may be used.
 */
 
 #include <getopt.h>
@@ -75,7 +76,7 @@ static int num_side[2];             // number of non-king pieces of each side
 static int shift[MAX_PIECES];
 static uint64_t mask[MAX_PIECES];
 static uint64_t mirror_all;
-static int budget;          // fresh budget in plies, see MAKRUK.md
+static int budget;          // fresh budget in plies (docs/variants/makruk.md)
 static int num_pawns;       // number of pawns (Cambodian tables only)
 static uint64_t *work_g;
 static int minfreq = 8;
@@ -839,7 +840,8 @@ static void write_dtz(uint8_t *buf)
     uint64_t freq[4][256];
     memset(map, 0, sizeof(*map));
     memset(freq, 0, sizeof(freq));
-    // wins store D - 1 = 2j - 2, losses store D = 2j (see MAKRUK.md)
+    // wins store D - 1 = 2j - 2, losses store D = 2j
+    // (see docs/variants/makruk.md)
     for (int j = 1; j <= MAX_WIN; j++)
       if (2 * j - 1 <= budget)
         freq[0][2 * j - 2] += stats[s][WIN(j)];

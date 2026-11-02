@@ -61,6 +61,9 @@ cmtbgen cmtbver cmtbprobe cmtbclean:
 astbgen astbgenp astbver astbverp astbprobe astbclean:
 	@$(MAKE) -f Makefile.asean $@
 
+ktbgen ktbver kclean:
+	@$(MAKE) -f Makefile.racing $@
+
 #atbgen atbgenp atbver atbverp aclean:
 atomic: atbgen atbgenp atbver atbverp tbcheck
 
@@ -76,6 +79,8 @@ cambodian: cmtbgen cmtbver cmtbprobe tbcheck
 
 asean: astbgen astbgenp astbver astbverp astbprobe tbcheck
 
+racing: ktbgen ktbver tbcheck
+
 .PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean \
 	atbgen atbgenp atbver atbverp aclean \
 	stbgen stbgenp sclean \
@@ -83,4 +88,5 @@ asean: astbgen astbgenp astbver astbverp astbprobe tbcheck
 	jtbgen jtbgenp jtbver jtbverp jclean \
 	mtbgen mtbgenp mtbver mtbverp mprobe mtbclean \
 	cmtbgen cmtbver cmtbprobe cmtbclean \
-	astbgen astbgenp astbver astbverp astbprobe astbclean
+	astbgen astbgenp astbver astbverp astbprobe astbclean \
+	ktbgen ktbver kclean

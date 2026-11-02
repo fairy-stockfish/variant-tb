@@ -33,6 +33,8 @@ jobs:
             targets: cmtbgen cmtbver tbcheck
           - variant: asean
             targets: astbgen astbgenp astbver astbverp tbcheck
+          - variant: racing
+            targets: ktbgen ktbver tbcheck
 
     steps:
       - uses: actions/checkout@v4

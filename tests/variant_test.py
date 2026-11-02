@@ -51,6 +51,7 @@ class Variant:
     pawnful_suffix: str = "p"  # pawnful tables use <prefix>tbgen<suffix>
     # the pawnful verifier also handles symmetric material (e.g. KPvKP)
     verify_symmetric_pawnful: bool = False
+    color_symmetry: bool = True    # KXvKY also covers KYvKX
 
 
 VARIANTS = {
@@ -63,13 +64,17 @@ VARIANTS = {
     # Bare king loses in shatranj, so the smallest tables have 4 pieces.
     "shatranj": Variant("j", "jtb", "JTBPATH", True, 4, 4,
                         bare_king_tables=False),
-    # Makruk family (see MAKRUK.md): S is the khon, M the met.
+    # Makruk family (see docs/variants/makruk.md): S is the khon, M the met.
     "makruk":   Variant("m", "mk", "MKTBPATH", True, 3, 3, pieces="KRSNMP"),
     # All Cambodian tables, also those with pawns, are generated and
     # verified by cmtbgen/cmtbver.
     "cambodian": Variant("cm", "cm", "CMTBPATH", True, 3, 3, pieces="KRSNMP",
                          pawnful_suffix="", verify_symmetric_pawnful=True),
     "asean":    Variant("as", "as", "ASTBPATH", True, 3, 3, pieces="KRSNMP"),
+    # Racing kings has no pawns, and white and black material cannot be
+    # swapped, so e.g. KRvK and KvKR are separate tables.
+    "racing":   Variant("k", "ktb", "KTBPATH", True, 3, 3, pawns=False,
+                        color_symmetry=False),
 }
 
 
@@ -81,19 +86,21 @@ def canonical_tables(v: Variant, npieces: int):
     """Canonical table names with npieces pieces (same naming as probe.c):
     side with more pieces first, pieces of each side in the variant's piece
     order (KQRBNP for chess) and, for equal piece counts, the
-    lexicographically smaller side first."""
+    lexicographically smaller side first. Without color symmetry, white is
+    always the first side."""
     names = set()
     if v.royal_king:
         others = npieces - 2
         for nw in range(others, -1, -1):
             nb = others - nw
-            if nw < nb:
+            if nw < nb and v.color_symmetry:
                 continue
             if nb == 0 and not v.bare_king_tables:
                 continue
             for w in combinations_with_replacement(v.pieces[1:], nw):
                 for b in combinations_with_replacement(v.pieces[1:], nb):
-                    if nw == nb and order(v, w) > order(v, b):
+                    if (nw == nb and order(v, w) > order(v, b)
+                            and v.color_symmetry):
                         continue
                     names.add("K" + "".join(w) + "vK" + "".join(b))
     else:

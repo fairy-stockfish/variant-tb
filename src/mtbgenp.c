@@ -8,9 +8,9 @@
   occur on ranks 3-5 (white) / 4-6 (black) and promote to a met on the
   6th (white) / 3rd (black) rank. Captures and promotions into pawnless
   positions are evaluated by probe_tb() with the pawnless WDL values,
-  which assume a freshly started count (see MAKRUK.md). Makruk has no
-  50-move rule, so "cursed" results (DTZ > DRAW_RULE) are real wins and
-  losses.
+  which assume a freshly started count (see docs/variants/makruk.md).
+  Makruk has no 50-move rule, so "cursed" results (DTZ > DRAW_RULE) are
+  real wins and losses.
 */
 
 #define REDUCE_PLY 118

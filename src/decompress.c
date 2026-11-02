@@ -31,6 +31,10 @@ void decomp_init_piece(int *pcs)
 {
   int i, k;
 
+#ifdef RACING
+  (void)i; (void)k;
+  enc_type = 1;
+#else
   for (i = 0, k = 0; i < 16; i++)
     if (pcs[i] == 1) k++;
   if (k >= 3) enc_type = 0;
@@ -41,6 +45,7 @@ void decomp_init_piece(int *pcs)
       if (pcs[i] < k && pcs[i] > 1) k = pcs[i];
     enc_type = 1 + k;
   }
+#endif
   pawns0 = pawns1 = 0;
 }
 
@@ -151,7 +156,7 @@ static void decomp_setup_pieces_piece(struct tb_handle *H, uint64_t *tb_size)
   for (i = 0; i < numpcs; i++)
     entry->pieces[0][i] = data[i + 1] & 0x0f;
 #ifdef MAKRUK
-  // raw index, see MAKRUK.md
+  // raw index, see docs/variants/makruk.md
   (void)order;
   tb_size[0] = tb_size[1] = MK_RAW_SIZE(numpcs);
   if (H->split) {
