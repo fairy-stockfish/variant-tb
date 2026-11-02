@@ -17,11 +17,14 @@ the table below.
 
 | Variant  | Build target (`make -C src ...`) | Binaries | Table files | Path variable | Notes |
 |----------|----------------------------------|----------|-------------|---------------|-------|
-| Chess    | `all`      | `rtbgen`, `rtbgenp`, `rtbver`, `rtbverp` | `.rtbw`/`.rtbz` | `RTBPATH` | Identical to upstream Syzygy tables. |
-| Atomic   | `atbgen atbver atbverp tbcheck` | `atbgen`, `atbgenp`, `atbver`, `atbverp` | `.atbw`/`.atbz` | `ATBPATH` | `atbgenp` (pawnful tables) currently does not compile, so `make atomic` fails. |
-| Suicide  | `suicide`  | `stbgen`, `stbgenp` | `.stbw`/`.stbz` | `STBPATH` | Losing chess, FICS rules (stalemate: side with fewer pieces wins). No verifier. |
-| Giveaway | `giveaway` | `gtbgen`, `gtbgenp` | `.gtbw`/`.gtbz` | `GTBPATH` | Losing chess, stalemated side wins (antichess). No verifier. |
-| Shatranj | `shatranj` | `jtbgen`, `jtbgenp`, `jtbver`, `jtbverp` | `.jtbw`/`.jtbz` | `JTBPATH` | 70-move rule, bare king loses. `Q` denotes the ferz, `B` the alfil. |
+| [Chess](docs/variants/regular.md)    | `all`      | `rtbgen`, `rtbgenp`, `rtbver`, `rtbverp` | `.rtbw`/`.rtbz` | `RTBPATH` | Identical to upstream Syzygy tables. |
+| [Atomic](docs/variants/atomic.md)   | `atbgen atbver atbverp tbcheck` | `atbgen`, `atbgenp`, `atbver`, `atbverp` | `.atbw`/`.atbz` | `ATBPATH` | `atbgenp` (pawnful tables) currently does not compile. |
+| [Suicide](docs/variants/suicide.md)  | `suicide`  | `stbgen`, `stbgenp` | `.stbw`/`.stbz` | `STBPATH` | Losing chess, FICS stalemate rule. No verifier. |
+| [Giveaway](docs/variants/giveaway.md) | `giveaway` | `gtbgen`, `gtbgenp` | `.gtbw`/`.gtbz` | `GTBPATH` | Losing chess, antichess stalemate rule. No verifier. |
+| [Shatranj](docs/variants/shatranj.md) | `shatranj` | `jtbgen`, `jtbgenp`, `jtbver`, `jtbverp` | `.jtbw`/`.jtbz` | `JTBPATH` | 70-move rule, bare king loses. |
+
+Rules, file format details, resource requirements and known limitations of
+each variant are documented in [docs/variants/](docs/variants/).
 
 All variants use `tbcheck` (built by every target) to check the embedded
 checksums. Statistics are written to `$<X>TBSTATSDIR` and verification logs
@@ -73,7 +76,9 @@ A new variant is added in one pull request that
 1. implements the variant in the generator (a new `-D<VARIANT>` define, its
    own `src/Makefile.<variant>` and targets in `src/Makefile`, and a unique
    file suffix, path variable and magic numbers in `src/probe.h`),
-2. adds the variant to the table of supported variants above,
+2. documents the variant in `docs/variants/<variant>.md` (starting from
+   [TEMPLATE.md](docs/variants/TEMPLATE.md)) and adds it to the table of
+   supported variants above,
 3. adds the variant to `VARIANTS` in `tests/variant_test.py`, creates its
    reference checksums with `tests/variant_test.py <variant> --update-checksums`,
    and
