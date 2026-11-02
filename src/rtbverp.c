@@ -85,38 +85,73 @@ static uint8_t w_skip[14];
 
 // really a 5x7 matrix
 static uint8_t wdl_matrix[256][8] = {
+#ifndef MISERE
   { WDL_LOSS, WDL_MATE, WDL_CAPT_LOSS, WDL_CAPT_CLOSS, WDL_CAPT_DRAW, WDL_CAPT_CWIN, WDL_CAPT_WIN, 0 },
+#else
+  // misere: a checkmated position is a win for the side to move
+  { WDL_LOSS, WDL_ERROR, WDL_CAPT_LOSS, WDL_CAPT_CLOSS, WDL_CAPT_DRAW, WDL_CAPT_CWIN, WDL_CAPT_WIN, 0 },
+#endif
   { WDL_CLOSS, WDL_ERROR, WDL_CLOSS, WDL_CAPT_CLOSS, WDL_CAPT_DRAW, WDL_CAPT_CWIN, WDL_CAPT_WIN, 0 },
   { WDL_DRAW, WDL_ERROR, WDL_DRAW, WDL_DRAW, WDL_CAPT_DRAW, WDL_CAPT_CWIN, WDL_CAPT_WIN, 0 },
   { WDL_CWIN, WDL_ERROR, WDL_CWIN, WDL_CWIN, WDL_CWIN, WDL_CAPT_CWIN, WDL_CAPT_WIN, 0 },
+#ifndef MISERE
   { WDL_WIN, WDL_ERROR, WDL_WIN, WDL_WIN, WDL_WIN, WDL_WIN, WDL_CAPT_WIN, 0 }
+#else
+  { WDL_WIN, WDL_MATE, WDL_WIN, WDL_WIN, WDL_WIN, WDL_WIN, WDL_CAPT_WIN, 0 }
+#endif
 };
 
 static uint8_t wdl_pawn[6][16];
 
 static char wdl_to_pawn[16] = {
+#ifndef MISERE
   2, 2, 2, 1, 1, -1, -2, -3, 0, 0, -1, -2, -3, -3
+#else
+  // misere: a pawn move into a checkmated position loses
+  -2, 2, 2, 1, 1, -1, -2, -3, 0, 0, -1, -2, -3, -3
+#endif
 };
 
 static uint8_t pawn_skip[16];
 
 static int wdl_tbl_to_wdl[] = {
+#ifndef MISERE
   1, 1, 1, 3, 3, 2, 0
+#else
+  0, 1, 1, 3, 3, 2, 0 // checkmate is stored as a win
+#endif
 };
 
 #define DTZ_BROKEN 255
 #define DTZ_ERROR 254 // CHECK!
 #define DTZ_ILLEGAL 0
-//#define DTZ_PAWN_WIN 1
+
+// DTZ values are ordered from best (small) to worst (large) for the side to
+// move. In misere chess being checkmated is the best possible outcome (a win
+// in 0 ply), so DTZ_MATE is placed below DTZ_CAPT_WIN. A move into a
+// checkmated position loses in 1 ply, which is encoded as DTZ_CAPT_LOSS.
+#ifndef MISERE
 #define DTZ_CAPT_WIN 1
 #define DTZ_BASE_WIN 2
+#define DTZ_MATE 253
+#define DTZ_CAPT_LOSS 252
+#define DTZ_BASE_LOSS 252
+#define DTZ_MIN_LEGAL DTZ_CAPT_WIN
+#define DTZ_MAX_LEGAL DTZ_MATE
+#else
+#define DTZ_MATE 1
+#define DTZ_CAPT_WIN 2
+#define DTZ_BASE_WIN 3
+#define DTZ_CAPT_LOSS 253
+#define DTZ_BASE_LOSS 253
+#define DTZ_MIN_LEGAL DTZ_MATE
+#define DTZ_MAX_LEGAL DTZ_CAPT_LOSS
+#endif
+//#define DTZ_PAWN_WIN 1
 int dtz_capt_cwin;
 int dtz_base_cwin;
 int dtz_draw;
 int dtz_capt_draw;
-#define DTZ_MATE 253 // CHECK!
-#define DTZ_CAPT_LOSS 252
-#define DTZ_BASE_LOSS 252
 int dtz_capt_closs;
 int dtz_base_closs;
 int max_dtz_cursed;
@@ -247,11 +282,17 @@ void init_wdl_dtz(void)
 
   // WDL_CAPT_DRAW
   dtz_to_opp[WDL_CAPT_DRAW][DTZ_ILLEGAL] = opp_capt_draw;
-  for (i = DTZ_CAPT_WIN; i <= dtz_capt_draw; i++)
+  for (i = DTZ_MIN_LEGAL; i <= dtz_capt_draw; i++)
     dtz_to_opp[WDL_CAPT_DRAW][i] = opp_capt_draw;
 
   // WDL_WIN
+#ifndef MISERE
   dtz_to_opp[WDL_WIN][DTZ_MATE] = DTZ_BASE_WIN; // special case
+#else
+  // misere: a move into a checkmated position loses in 1 ply
+  dtz_to_opp[WDL_LOSS][DTZ_MATE] = DTZ_CAPT_LOSS;
+  dtz_to_opp[WDL_CAPT_LOSS][DTZ_MATE] = DTZ_CAPT_LOSS;
+#endif
   if (ply_accurate_loss) {
     dtz_to_opp[WDL_WIN][DTZ_CAPT_LOSS] = DTZ_BASE_WIN + 2;
     for (i = 0; i < loss_num - 1; i++)
@@ -264,7 +305,7 @@ void init_wdl_dtz(void)
 
   // WDL_CAPT_WIN
   dtz_to_opp[WDL_CAPT_WIN][DTZ_ILLEGAL] = DTZ_CAPT_WIN;
-  for (i = DTZ_CAPT_WIN; i <= DTZ_MATE; i++)
+  for (i = DTZ_MIN_LEGAL; i <= DTZ_MAX_LEGAL; i++)
     dtz_to_opp[WDL_CAPT_WIN][i] = DTZ_CAPT_WIN;
 
   // WDL_CWIN
@@ -277,10 +318,10 @@ void init_wdl_dtz(void)
   // WDL_CAPT_CWIN
   dtz_to_opp[WDL_CAPT_CWIN][DTZ_ILLEGAL] = opp_capt_cwin;
   if (ply_accurate_loss)
-    for (i = DTZ_CAPT_WIN; i <= DTZ_BASE_LOSS - loss_num; i++)
+    for (i = DTZ_MIN_LEGAL; i <= DTZ_BASE_LOSS - loss_num; i++)
       dtz_to_opp[WDL_CAPT_CWIN][i] = opp_capt_cwin;
   else
-    for (i = DTZ_CAPT_WIN; i <= dtz_capt_closs; i++)
+    for (i = DTZ_MIN_LEGAL; i <= dtz_capt_closs; i++)
       dtz_to_opp[WDL_CAPT_CWIN][i] = opp_capt_cwin;
 
   // WDL_LOSS
@@ -316,7 +357,7 @@ void init_wdl_dtz(void)
 
   // WDL_CAPT_CLOSS
   dtz_to_opp[WDL_CAPT_CLOSS][DTZ_ILLEGAL] = opp_capt_closs;
-  for (i = DTZ_CAPT_WIN; i < dtz_capt_cwin; i++)
+  for (i = DTZ_MIN_LEGAL; i < dtz_capt_cwin; i++)
     dtz_to_opp[WDL_CAPT_CLOSS][i] = opp_capt_closs;
   dtz_to_opp[WDL_CAPT_CLOSS][dtz_capt_cwin] = opp_base_closs;
   for (i = 0; i <= max_dtz_cursed; i++)
@@ -333,7 +374,7 @@ void init_wdl_dtz(void)
 
   // CAPT_DRAW
   dtz_matrix[dtz_capt_draw][DTZ_ILLEGAL] = 1;
-  for (i = DTZ_CAPT_WIN; i <= opp_capt_draw; i++)
+  for (i = DTZ_MIN_LEGAL; i <= opp_capt_draw; i++)
     dtz_matrix[dtz_capt_draw][i] = 1;
 
   // MATE
@@ -341,11 +382,17 @@ void init_wdl_dtz(void)
 
   // CAPT_WIN
   dtz_matrix[DTZ_CAPT_WIN][DTZ_ILLEGAL] = 1;
-  for (i = DTZ_CAPT_WIN; i <= DTZ_MATE; i++)
+  for (i = DTZ_MIN_LEGAL; i <= DTZ_MAX_LEGAL; i++)
     dtz_matrix[DTZ_CAPT_WIN][i] = 1;
 
   // BASE_WIN
+#ifndef MISERE
   dtz_matrix[DTZ_BASE_WIN + 1][DTZ_MATE] = 1;
+#else
+  // misere: a loss in 1 ply by moving into a checkmated position
+  dtz_matrix[DTZ_BASE_LOSS - 1][DTZ_MATE] = 1;
+  dtz_matrix[DTZ_CAPT_LOSS][DTZ_MATE] = 1;
+#endif
   if (ply_accurate_win) {
     dtz_matrix[DTZ_BASE_WIN + 2][DTZ_CAPT_LOSS] = 1;
     for (i = 1; i < win_num; i++)
@@ -381,7 +428,7 @@ void init_wdl_dtz(void)
   if (ply_accurate_win) {
     // CAPT_CWIN
     dtz_matrix[dtz_capt_cwin][DTZ_ILLEGAL] = 1;
-    for (i = DTZ_CAPT_WIN; i <= DTZ_BASE_LOSS - win_num; i++)
+    for (i = DTZ_MIN_LEGAL; i <= DTZ_BASE_LOSS - win_num; i++)
       dtz_matrix[dtz_capt_cwin][i] = 1;
 
     // BASE_CWIN
@@ -391,7 +438,7 @@ void init_wdl_dtz(void)
   } else {
     // CAPT_CWIN
     dtz_matrix[dtz_capt_cwin][DTZ_ILLEGAL] = 1;
-    for (i = DTZ_CAPT_WIN; i <= opp_capt_closs; i++)
+    for (i = DTZ_MIN_LEGAL; i <= opp_capt_closs; i++)
       dtz_matrix[dtz_capt_cwin][i] = 1;
 
     // BASE_CWIN
@@ -404,7 +451,7 @@ void init_wdl_dtz(void)
   if (ply_accurate_loss) {
     // CAPT_CLOSS
     dtz_matrix[dtz_capt_closs][DTZ_ILLEGAL] = 1;
-    for (i = DTZ_CAPT_WIN; i <= opp_capt_cwin; i++)
+    for (i = DTZ_MIN_LEGAL; i <= opp_capt_cwin; i++)
       dtz_matrix[dtz_capt_closs][i] = 1;
 
     // BASE_CLOSS
@@ -414,7 +461,7 @@ void init_wdl_dtz(void)
   } else {
     // CAPT_CLOSS
     dtz_matrix[dtz_capt_closs][DTZ_ILLEGAL] = 1;
-    for (i = DTZ_CAPT_WIN; i <= opp_capt_cwin; i++)
+    for (i = DTZ_MIN_LEGAL; i <= opp_capt_cwin; i++)
       dtz_matrix[dtz_capt_closs][i] = 1;
 
     // BASE_CLOSS
@@ -461,22 +508,22 @@ void init_pawn_dtz(int opp)
   if (!opp) {
     dtz_to_wdl[DTZ_ILLEGAL] = -3;
     dtz_to_wdl[dtz_draw] = dtz_to_wdl[dtz_capt_draw] = 0;
-    for (i = DTZ_CAPT_WIN; i < dtz_capt_cwin; i++)
+    for (i = DTZ_MIN_LEGAL; i < dtz_capt_cwin; i++)
       dtz_to_wdl[i] = -2;
     for (; i <= dtz_capt_cwin + max_dtz_cursed; i++)
       dtz_to_wdl[i] = -1;
-    for (i = DTZ_MATE; i > dtz_capt_closs; i--)
+    for (i = DTZ_MAX_LEGAL; i > dtz_capt_closs; i--)
       dtz_to_wdl[i] = 2;
     for (; i >= dtz_capt_closs - max_dtz_cursed; i--)
       dtz_to_wdl[i] = 1;
   } else {
     dtz_to_wdl[DTZ_ILLEGAL] = -3;
     dtz_to_wdl[opp_draw] = dtz_to_wdl[opp_capt_draw] = 0;
-    for (i = DTZ_CAPT_WIN; i < opp_capt_cwin; i++)
+    for (i = DTZ_MIN_LEGAL; i < opp_capt_cwin; i++)
       dtz_to_wdl[i] = -2;
     for (; i <= opp_capt_cwin + max_dtz_cursed; i++)
       dtz_to_wdl[i] = -1;
-    for (i = DTZ_MATE; i > opp_capt_closs; i--)
+    for (i = DTZ_MAX_LEGAL; i > opp_capt_closs; i--)
       dtz_to_wdl[i] = 2;
     for (; i >= opp_capt_closs - max_dtz_cursed; i--)
       dtz_to_wdl[i] = 1;
@@ -1680,7 +1727,15 @@ void calc_pawn_moves_w(struct thread_data *thread)
           }
           int v = wdl_to_pawn[table_b[idx2]];
           if (v1 < 3) {
-            if (v1 < v || (table_b[idx2] == WDL_DRAW &&
+            // If the side to move has no legal moves apart from en passant
+            // captures, it must play one. This happens if the position is
+            // (stale)mate when en passant is ignored. In misere chess the
+            // checkmated side wins, so the check v1 < v does not catch it.
+            if (v1 < v
+#ifdef MISERE
+                || table_b[idx2] == WDL_MATE
+#endif
+                || (table_b[idx2] == WDL_DRAW &&
               !has_moves_pieces(black_pcs, idx2, table_w,
                                 occ ^ bit[p[i]] ^ bit[p[i] + 0x10], p) &&
               !has_moves_pawns_b(idx2, occ ^ bit[p[i]] ^ bit[p[i] + 0x10], p)))
@@ -1759,7 +1814,15 @@ void calc_pawn_moves_b(struct thread_data *thread)
           }
           int v = wdl_to_pawn[table_w[idx2]];
           if (v1 < 3) {
-            if (v1 < v || (table_w[idx2] == WDL_DRAW &&
+            // If the side to move has no legal moves apart from en passant
+            // captures, it must play one. This happens if the position is
+            // (stale)mate when en passant is ignored. In misere chess the
+            // checkmated side wins, so the check v1 < v does not catch it.
+            if (v1 < v
+#ifdef MISERE
+                || table_w[idx2] == WDL_MATE
+#endif
+                || (table_w[idx2] == WDL_DRAW &&
               !has_moves_pieces(white_pcs, idx2, table_b,
                                 occ ^ bit[p[i]] ^ bit[p[i] - 0x10], p) &&
               !has_moves_pawns_w(idx2, occ ^ bit[p[i]] ^ bit[p[i] - 0x10], p)))

@@ -251,11 +251,16 @@ The generator can also produce tables for misère chess: all rules are
 those of regular chess (including the 50-move rule and stalemate being a
 draw), except that the side that is checkmated **wins**.
 
-Build with `make misere` (or `make mtbgen mtbgenp`). This produces:
+Build with `make misere` (or `make mtbgen mtbgenp mtbver mtbverp`). This
+produces:
 * mtbgen for generating pawnless misère tablebases.
 * mtbgenp for generating pawnful misère tablebases.
+* mtbver for verifying pawnless misère tablebases.
+* mtbverp for verifying pawnful misère tablebases.
 
-Usage and options are the same as for rtbgen and rtbgenp. The resulting
+Usage and options are the same as for rtbgen, rtbgenp, rtbver and rtbverp
+(including the restriction that pawnful tables with symmetric material such
+as KPvKP cannot be verified). The resulting
 files have the suffixes .mtbw and .mtbz. Subtables are looked up in the
 directories listed in **$MTBPATH**, statistics are written to
 **$MTBSTATSDIR**.
@@ -263,10 +268,8 @@ directories listed in **$MTBPATH**, statistics are written to
 In the WDL tables a checkmated position is stored as a win for the side
 to move. A move that checkmates the opponent is a loss with DTZ = -1.
 The DTZ value stored for a checkmated position itself is not meaningful
-(the game is already over); probing code should detect checkmate before
-probing DTZ.
-
-There is no verifier for misère tables yet.
+(the game is already over; it is stored like a win with DTZ = 1); probing
+code should detect checkmate before probing DTZ.
 
 
 ### Adding tablebase support to your program

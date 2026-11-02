@@ -155,6 +155,56 @@ static int is_attacked(int sq, int *pcs, bitboard occ, int *p)
   return 0;
 }
 
+#ifdef MISERE
+// Returns 1 if the side with color clr (0 = white, 8 = black) has a legal
+// move other than an en passant capture in the position given by p and occ.
+// Only used in the rare case that a double pawn push allows an en passant
+// capture, so it does not need to be fast.
+static int has_legal_move(int clr, int *p, bitboard occ)
+{
+  int i, k, m;
+  int n = numpcs;
+  int opp[MAX_PIECES];
+  int king = clr ? black_king : white_king;
+  bitboard own = 0;
+
+  for (i = 0; i < n; i++)
+    if ((pt[i] & 0x08) == clr)
+      own |= bit[p[i]];
+
+  for (k = 0; k < n; k++) {
+    if ((pt[k] & 0x08) != clr) continue;
+    int from = p[k];
+    bitboard targets;
+    if ((pt[k] & 0x07) == PAWN) {
+      int fwd = clr ? from - 8 : from + 8;
+      targets = pawn_range[clr >> 3][from] & occ & ~own;
+      if (!(bit[fwd] & occ)) {
+        targets |= bit[fwd];
+        int fwd2 = clr ? from - 16 : from + 16;
+        if ((clr ? from >= 0x30 : from < 0x10) && !(bit[fwd2] & occ))
+          targets |= bit[fwd2];
+      }
+    } else
+      targets = PieceRange(from, pt[k], occ) & ~own;
+    while (targets) {
+      int sq = FirstOne(targets);
+      ClearFirst(targets);
+      for (i = 0, m = 0; i < n; i++)
+        if ((pt[i] & 0x08) != clr && p[i] != sq)
+          opp[m++] = i;
+      opp[m] = -1;
+      p[k] = sq;
+      int legal = !is_attacked(p[king], opp, (occ & ~bit[from]) | bit[sq], p);
+      p[k] = from;
+      if (legal) return 1;
+    }
+  }
+
+  return 0;
+}
+#endif
+
 // pawn moves and captures have been taken care of already
 static int check_mate(int *pcs, uint64_t idx0, uint8_t *table, bitboard occ,
     int *p)
@@ -1022,6 +1072,19 @@ static void calc_pawn_moves_w(struct thread_data *thread)
           if (v1 < 3) {
             if (v1 < v || (table_b[idx2] == UNKNOWN && !has_moves(black_pcs, idx2, table_w, occ ^ bit[p[i]] ^ bit[p[i] + 0x10], p)))
               v = v1;
+#ifdef MISERE
+            // In misere chess a position that is checkmate when en passant
+            // is ignored is stored as a win for the checkmated side. If the
+            // only legal moves are en passant captures, one must be played.
+            else if (v == -2 && table_b[idx2] != CAPT_WIN) {
+              int pos2[MAX_PIECES];
+              for (k = 0; k < n; k++)
+                pos2[k] = p[k];
+              pos2[i] = p[i] + 0x10;
+              if (!has_legal_move(8, pos2, occ ^ bit[p[i]] ^ bit[p[i] + 0x10]))
+                v = v1;
+            }
+#endif
           }
           if (v > best) best = v;
         }
@@ -1103,6 +1166,19 @@ static void calc_pawn_moves_b(struct thread_data *thread)
           if (v1 < 3) {
             if (v1 < v || (table_w[idx2] == UNKNOWN && !has_moves(white_pcs, idx2, table_b, occ ^ bit[p[i]] ^ bit[p[i] - 0x10], p)))
               v = v1;
+#ifdef MISERE
+            // In misere chess a position that is checkmate when en passant
+            // is ignored is stored as a win for the checkmated side. If the
+            // only legal moves are en passant captures, one must be played.
+            else if (v == -2 && table_w[idx2] != CAPT_WIN) {
+              int pos2[MAX_PIECES];
+              for (k = 0; k < n; k++)
+                pos2[k] = p[k];
+              pos2[i] = p[i] - 0x10;
+              if (!has_legal_move(0, pos2, occ ^ bit[p[i]] ^ bit[p[i] - 0x10]))
+                v = v1;
+            }
+#endif
           }
           if (v > best) best = v;
         }
