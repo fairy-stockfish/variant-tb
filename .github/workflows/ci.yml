@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  variant:
+    name: ${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # One entry per supported variant. "targets" are the make targets
+          # in src/Makefile that build the binaries the test needs.
+          - variant: regular
+            targets: rtbgen rtbgenp rtbver rtbverp tbcheck
+          - variant: atomic
+            # atbgenp does not compile yet, so pawnful atomic tables are
+            # not tested (see tests/variant_test.py).
+            targets: atbgen atbver tbcheck
+          - variant: suicide
+            targets: stbgen stbgenp tbcheck
+          - variant: giveaway
+            targets: gtbgen gtbgenp tbcheck
+          - variant: shatranj
+            targets: jtbgen jtbgenp jtbver jtbverp tbcheck
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libzstd-dev
+
+      - name: Build
+        # Built sequentially: the sub-makes of different targets share
+        # object directories and are not safe to run in parallel.
+        run: |
+          for t in ${{ matrix.targets }}; do
+            make -C src "$t"
+          done
+
+      - name: Generate and verify tables
+        run: python3 tests/variant_test.py ${{ matrix.variant }} -t "$(nproc)"
