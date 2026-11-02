@@ -1,3 +1,87 @@
+# variant-tb
+
+[![CI](https://github.com/fairy-stockfish/variant-tb/actions/workflows/ci.yml/badge.svg)](https://github.com/fairy-stockfish/variant-tb/actions/workflows/ci.yml)
+
+**variant-tb** is a fork of Ronald de Man's Syzygy tablebase
+generator ([syzygy1/tb](https://github.com/syzygy1/tb)) that extends it with
+support for more chess variants. Its main purpose is to generate endgame
+tablebases that can be used by
+[Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish).
+
+The original upstream documentation follows below the variant-specific
+sections; unless stated otherwise it applies to all variants, with the
+binary names, file suffixes and environment variables replaced as listed in
+the table below.
+
+### Supported variants
+
+| Variant  | Build target (`make -C src ...`) | Binaries | Table files | Path variable | Notes |
+|----------|----------------------------------|----------|-------------|---------------|-------|
+| Chess    | `all`      | `rtbgen`, `rtbgenp`, `rtbver`, `rtbverp` | `.rtbw`/`.rtbz` | `RTBPATH` | Identical to upstream Syzygy tables. |
+| Atomic   | `atbgen atbver atbverp tbcheck` | `atbgen`, `atbgenp`, `atbver`, `atbverp` | `.atbw`/`.atbz` | `ATBPATH` | `atbgenp` (pawnful tables) currently does not compile, so `make atomic` fails. |
+| Suicide  | `suicide`  | `stbgen`, `stbgenp` | `.stbw`/`.stbz` | `STBPATH` | Losing chess, FICS rules (stalemate: side with fewer pieces wins). No verifier. |
+| Giveaway | `giveaway` | `gtbgen`, `gtbgenp` | `.gtbw`/`.gtbz` | `GTBPATH` | Losing chess, stalemated side wins (antichess). No verifier. |
+| Shatranj | `shatranj` | `jtbgen`, `jtbgenp`, `jtbver`, `jtbverp` | `.jtbw`/`.jtbz` | `JTBPATH` | 70-move rule, bare king loses. `Q` denotes the ferz, `B` the alfil. |
+
+All variants use `tbcheck` (built by every target) to check the embedded
+checksums. Statistics are written to `$<X>TBSTATSDIR` and verification logs
+to `<x>tblog.txt`, with the same prefix letter as the binaries. In suicide and
+giveaway the king is an ordinary piece, so table names have no implicit
+kings (e.g. `KvQ`, `RNvP`).
+
+Note that the top-level `make -C src <target>` invocations should not be run
+in parallel with each other (e.g. `make -j atomic suicide`), because the
+sub-makes of one variant share their object directory.
+
+
+### Continuous integration
+
+Every push and pull request runs `.github/workflows/ci.yml`. For each
+supported variant it builds the binaries and runs `tests/variant_test.py`,
+which
+
+1. generates all tables of the smallest sizes (3 pieces for chess and atomic,
+   2 and 3 pieces for suicide and giveaway, 4 pieces for shatranj, where bare
+   king tables do not exist) in dependency order,
+2. verifies them with the variant's verifier, where one exists,
+3. checks the checksum embedded in every file with `tbcheck`, and
+4. compares these checksums against the reference list in
+   `tests/checksums/<variant>.txt`.
+
+Step 4 catches unintended changes to the generated tables. For chess the
+reference checksums are the official Syzygy checksums (see
+`checksums/wdl345.txt` and `checksums/dtz345.txt`). Each variant takes from a
+few seconds to about two minutes.
+
+The test can be run locally after building the binaries:
+
+```
+make -C src all
+tests/variant_test.py regular
+```
+
+Use `--min`/`--max` to test other table sizes and `--workdir DIR` to keep the
+generated tables. If a change intentionally alters the generated tables,
+regenerate the reference checksums with `--update-checksums` and commit them
+together with the change, explaining why the tables changed.
+
+
+### Adding a new variant
+
+A new variant is added in one pull request that
+
+1. implements the variant in the generator (a new `-D<VARIANT>` define, its
+   own `src/Makefile.<variant>` and targets in `src/Makefile`, and a unique
+   file suffix, path variable and magic numbers in `src/probe.h`),
+2. adds the variant to the table of supported variants above,
+3. adds the variant to `VARIANTS` in `tests/variant_test.py`, creates its
+   reference checksums with `tests/variant_test.py <variant> --update-checksums`,
+   and
+4. adds the variant to the build matrix in `.github/workflows/ci.yml`.
+
+CI then makes sure that the new variant keeps working as the code evolves.
+
+
 ### Overview
 
 This a generator for generating chess endgame database ("tablebases") for up
