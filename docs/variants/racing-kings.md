@@ -60,4 +60,5 @@ realistic (about 4 TB of RAM).
 ## Tables and probing
 
 The tables up to 5 pieces are available at
-https://huggingface.co/datasets/ianfab/racing-kings-syzygy (CC0).
+https://huggingface.co/datasets/ianfab/racing-kings-syzygy (CC0). Their
+checksums (as printed by `tbcheck --print`) are in `checksums/racing/`.
