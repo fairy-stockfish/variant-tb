@@ -66,5 +66,6 @@ generate as a chess table with the same number of pieces and pawns.
 
 ## Tables and probing
 
-No tables have been published yet. Fairy-Stockfish support for probing
-these tables is planned.
+The tables up to 5 pieces are available at
+https://huggingface.co/datasets/ianfab/schess-syzygy (CC0). Fairy-Stockfish
+support for probing these tables is planned.
