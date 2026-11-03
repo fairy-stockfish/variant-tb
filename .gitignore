@@ -3,6 +3,8 @@
 *.swp
 *.txt
 !tests/checksums/*.txt
+!checksums/*.txt
+!checksums/*/*.txt
 *.[rasgjlke]tb[wz]
 objs*/
 .deps*/

@@ -34,7 +34,8 @@ Same layout as the chess tables, with WDL magic `0x7e19c2a5` and DTZ magic
 `0xd3b8475e`. Pieces are stored in nibbles as in chess (type in bits 0-2,
 bit 3 set for black): pawn 1, knight 2, bishop 3, rook 4, queen 5, king 6
 and hawk 7. The elephant is stored with type bits 0, i.e. nibble `0x0` for
-a white and `0x8` for a black elephant.
+a white and `0x8` for a black elephant. Reference checksums of all tables
+with up to 5 pieces are in `checksums/schess/`.
 
 Internally the generator uses 4 bits for the piece type in S-Chess
 (`TYPE_MASK`/`BLACK_BIT` in `src/types.h`); for the other variants the
@@ -60,7 +61,7 @@ generate as a chess table with the same number of pieces and pawns.
 - As for chess, pawnful tables with symmetric material (e.g. `KPvKP`)
   cannot be verified.
 - The 7-piece probing limits (`TBMAX_PIECE`, `TBMAX_PAWN`, `HSHMAX`) are
-  sized for the complete 7-piece set, but tables with more than 4 pieces
+  sized for the complete 7-piece set, but tables with more than 5 pieces
   have not been generated yet.
 
 ## Tables and probing

@@ -59,6 +59,11 @@ reference checksums are the official Syzygy checksums (see
 `checksums/wdl345.txt` and `checksums/dtz345.txt`). Each variant takes from a
 few seconds to about two minutes.
 
+`tests/checksums/` only holds the reference checksums of the small tables
+used by this test. The checksums of complete sets of variant tables, e.g. all
+tables with up to 5 pieces, are in `checksums/<variant>/`, in the same format
+as for chess (`wdl345.txt` and `dtz345.txt`).
+
 The test can be run locally after building the binaries:
 
 ```
