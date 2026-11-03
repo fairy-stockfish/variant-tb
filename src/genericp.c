@@ -32,7 +32,12 @@ static uint64_t __inline__ MakeMove(uint64_t idx, int k, int sq)
   return idx | ((uint64_t)sq << shift[k]);
 }
 
+#if !defined(MAKRUK) || defined(ASEAN)
 #define PAWN_MASK 0xff000000000000ffULL
+#else
+// Makruk pawns never occur on ranks 1, 2, 7 and 8
+#define PAWN_MASK 0xffff00000000ffffULL
+#endif
 
 // use bit_set
 #if 1
@@ -252,7 +257,7 @@ static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int
 #define MARK_BEGIN \
   int sq; \
   uint64_t idx2; \
-  bitboard bb = PieceMoves1(p[k], pt[k], occ); \
+  bitboard bb = PieceRetroMoves1(p[k], pt[k], occ); \
   while (bb) { \
     sq = FirstOne(bb); \
     idx2 = MakeMove(idx, k, sq)
@@ -438,11 +443,30 @@ static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int
   } \
   if (pcs[j] < 0) continue
 
+// squares on which a captured pawn can stand
+#if defined(ASEAN)
+// ASEAN pawns start on the 3rd/6th rank and promote on the 8th/1st rank
+#define MIN_WPAWN 0x10
+#define MAX_WPAWN 0x38
+#define MIN_BPAWN 0x08
+#define MAX_BPAWN 0x30
+#elif !defined(MAKRUK)
+#define MIN_WPAWN 0x08
+#define MAX_WPAWN 0x38
+#define MIN_BPAWN 0x08
+#define MAX_BPAWN 0x38
+#else
+#define MIN_WPAWN 0x10
+#define MAX_WPAWN 0x28
+#define MIN_BPAWN 0x18
+#define MAX_BPAWN 0x30
+#endif
+
 #ifndef ATOMIC
 #define LOOP_WHITE_PIECES(func, ...) \
   do { for (j = 0; white_pcs[j] >= 0; j++) { \
     k = white_pcs[j]; \
-    if (i < numpawns && (p[k] < 0x08 || p[k] >= 0x38)) continue; \
+    if (i < numpawns && (p[k] < MIN_BPAWN || p[k] >= MAX_BPAWN)) continue; \
     uint64_t idx3 = idx2 | ((uint64_t)p[k] << shift[i]); \
     func(k, table_w, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)
@@ -464,7 +488,7 @@ static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int
 #define LOOP_BLACK_PIECES(func, ...) \
   do { for (j = 0; black_pcs[j] >= 0; j++) { \
     k = black_pcs[j]; \
-    if (i < numpawns && (p[k] < 0x08 || p[k] >= 0x38)) continue; \
+    if (i < numpawns && (p[k] < MIN_WPAWN || p[k] >= MAX_WPAWN)) continue; \
     uint64_t idx3 = idx2 | ((uint64_t)(p[k] ^ pw[i]) << shift[i]); \
     func(k, table_b, idx3 & ~mask[k], occ, p, ##__VA_ARGS__); \
   } } while (0)

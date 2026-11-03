@@ -31,8 +31,12 @@ static __inline__ int PopCount(bitboard x)
 #include "bmi2.h"
 
 extern bitboard knight_range[64], king_range[64];
-#ifdef SHATRANJ
+#if defined(SHATRANJ) || defined(MAKRUK)
 extern bitboard queen_range[64], bishop_range[64];
+#endif
+#ifdef MAKRUK
+// khon (silver general): one step diagonally or one step forward
+extern bitboard khon_range[2][64];
 #endif
 #ifdef HAS_PAWNS
 extern bitboard pawn_range[2][64];
@@ -48,7 +52,7 @@ extern bitboard atom_mask[64];
 
 #define KnightRange(x) knight_range[x]
 #define KingRange(x) king_range[x]
-#ifdef SHATRANJ
+#if defined(SHATRANJ) || defined(MAKRUK)
 #undef QueenRange
 #define QueenRange(x,occ) queen_range[x]
 #undef BishopRange
@@ -86,7 +90,11 @@ static __inline__ bitboard PieceRange(int sq, int type, bitboard occ)
   case KNIGHT:
     return KnightRange(sq);
   case BISHOP:
+#ifdef MAKRUK
+    return khon_range[(type & 0x08) >> 3][sq];
+#else
     return BishopRange(sq, occ);
+#endif
   case ROOK:
     return RookRange(sq, occ);
   case QUEEN:
@@ -110,7 +118,11 @@ static __inline__ bitboard PieceRange1(int sq, int type, bitboard occ)
   case KNIGHT:
     return KnightRange(sq);
   case BISHOP:
+#ifdef MAKRUK
+    return khon_range[(type & 0x08) >> 3][sq];
+#else
     return BishopRange(sq, occ);
+#endif
   case ROOK:
     return RookRange(sq, occ);
   case QUEEN:
@@ -132,7 +144,11 @@ static __inline__ bitboard PieceRange2(int sq, int type, bitboard occ)
   case KNIGHT:
     return KnightRange(sq);
   case BISHOP:
+#ifdef MAKRUK
+    return khon_range[(type & 0x08) >> 3][sq];
+#else
     return BishopRange(sq, occ);
+#endif
   case ROOK:
     return RookRange(sq, occ);
   case QUEEN:
@@ -145,6 +161,30 @@ static __inline__ bitboard PieceRange2(int sq, int type, bitboard occ)
 static __inline__ bitboard PieceMoves2(int sq, int type, bitboard occ)
 {
   return PieceRange2(sq, type, occ) & ~occ;
+}
+
+// Squares from which a piece of the given type can have moved to sq.
+// Only the khon is not symmetric.
+#ifdef MAKRUK
+#define RetroType(type) \
+  (((type) & 0x07) == BISHOP ? (type) ^ 0x08 : (type))
+#else
+#define RetroType(type) (type)
+#endif
+
+static __inline__ bitboard PieceRetroMoves(int sq, int type, bitboard occ)
+{
+  return PieceRange(sq, RetroType(type), occ) & ~occ;
+}
+
+static __inline__ bitboard PieceRetroMoves1(int sq, int type, bitboard occ)
+{
+  return PieceRange1(sq, RetroType(type), occ) & ~occ;
+}
+
+static __inline__ bitboard PieceRetroMoves2(int sq, int type, bitboard occ)
+{
+  return PieceRange2(sq, RetroType(type), occ) & ~occ;
 }
 
 #endif

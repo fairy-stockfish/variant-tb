@@ -85,7 +85,9 @@ static uint64_t global_stats_b[MAX_STATS];
 
 #include "genericp.c"
 
-#if defined(REGULAR)
+#if defined(ASEAN)
+#include "astbgenp.c"
+#elif defined(REGULAR)
 #include "rtbgenp.c"
 #elif defined(SUICIDE)
 #include "stbgenp.c"
@@ -93,6 +95,8 @@ static uint64_t global_stats_b[MAX_STATS];
 #include "atbgenp.c"
 #elif defined(LOSER)
 #include "ltbgenp.c"
+#elif defined(MAKRUK)
+#include "mtbgenp.c"
 #elif defined(SHATRANJ)
 #include "jtbgenp.c"
 #endif
@@ -896,7 +900,11 @@ int main(int argc, char **argv)
       pcs[KNIGHT | color]++;
       pt[j++] = KNIGHT | color;
       break;
+#ifndef MAKRUK
     case 'B':
+#else
+    case 'S':
+#endif
       pcs[BISHOP | color]++;
       pt[j++] = BISHOP | color;
       break;
@@ -904,7 +912,11 @@ int main(int argc, char **argv)
       pcs[ROOK | color]++;
       pt[j++] = ROOK | color;
       break;
+#ifndef MAKRUK
     case 'Q':
+#else
+    case 'M':
+#endif
       pcs[QUEEN | color]++;
       pt[j++] = QUEEN | color;
       break;
@@ -931,7 +943,7 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-#ifndef SHATRANJ
+#if !defined(SHATRANJ) || defined(MAKRUK)
   if (numpcs < 3) {
     fprintf(stderr, "Need at least 3 pawns or pieces.\n");
     exit(1);

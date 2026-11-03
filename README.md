@@ -23,6 +23,9 @@ the table below.
 | [Giveaway](docs/variants/giveaway.md) | `giveaway` | `gtbgen`, `gtbgenp`, `gtbver`, `gtbverp` | `.gtbw`/`.gtbz` | `GTBPATH` | Losing chess, antichess stalemate rule. |
 | [Shatranj](docs/variants/shatranj.md) | `shatranj` | `jtbgen`, `jtbgenp`, `jtbver`, `jtbverp` | `.jtbw`/`.jtbz` | `JTBPATH` | 70-move rule, bare king loses. |
 | [Racing Kings](docs/variants/racing-kings.md) | `racing` | `ktbgen`, `ktbver` | `.ktbw`/`.ktbz` | `KTBPATH` | No pawns, no color symmetry (`KRvK` and `KvKR` are separate tables). |
+| [Makruk](docs/variants/makruk.md) | `makruk` | `mtbgen`, `mtbgenp`, `mtbver`, `mtbverp`, `mprobe` | `.mkw`/`.mkz` | `MKTBPATH` | Thai chess with counting rules. Pawnless tables store a counting distance instead of DTZ. |
+| [Cambodian](docs/variants/cambodian.md) | `cambodian` | `cmtbgen`, `cmtbver`, `cmtbprobe` | `.cmw`/`.cmz` | `CMTBPATH` | Ouk Chatrang with counting rules. All tables (also with pawns) store a counting distance. |
+| [ASEAN](docs/variants/asean.md) | `asean` | `astbgen`, `astbgenp`, `astbver`, `astbverp`, `astbprobe` | `.asw`/`.asz` | `ASTBPATH` | 50-move rule and bare king counting. |
 
 Rules, file format details, resource requirements and known limitations of
 each variant are documented in [docs/variants/](docs/variants/).
@@ -32,6 +35,13 @@ checksums. Statistics are written to `$<X>TBSTATSDIR` and verification logs
 to `<x>tblog.txt`, with the same prefix letter as the binaries. In suicide and
 giveaway the king is an ordinary piece, so table names have no implicit
 kings (e.g. `KvQ`, `RNvP`).
+
+Makruk, Cambodian and ASEAN chess share the khon/met pieces (table names use
+`K R S N M P`, `S` = khon, `M` = met) and the helper scripts
+`src/run_makruk.py` (generate and verify a whole set) and `src/mktest.py`
+(random consistency checks). Their pawnless tables (and all Cambodian
+tables) use a different index and store a counting-rule aware distance
+instead of DTZ, see [docs/variants/makruk.md](docs/variants/makruk.md).
 
 Note that the top-level `make -C src <target>` invocations should not be run
 in parallel with each other (e.g. `make -j atomic suicide`), because the
@@ -44,9 +54,10 @@ Every push and pull request runs `.github/workflows/ci.yml`. For each
 supported variant it builds the binaries and runs `tests/variant_test.py`,
 which
 
-1. generates all tables of the smallest sizes (3 pieces for chess and atomic,
-   2 and 3 pieces for suicide and giveaway, 4 pieces for shatranj, where bare
-   king tables do not exist, 3 pieces for racing kings) in dependency order,
+1. generates all tables of the smallest sizes (3 pieces for chess, atomic,
+   racing kings, Makruk, Cambodian and ASEAN, 2 and 3 pieces for suicide and
+   giveaway, 4 pieces for shatranj, where bare king tables do not exist) in
+   dependency order,
 2. verifies them with the variant's verifier, where one exists,
 3. checks the checksum embedded in every file with `tbcheck`, and
 4. compares these checksums against the reference list in

@@ -1,0 +1,9 @@
+PREFIX = mtb
+DEPDIR = .depsm
+OBJDIR = objsm
+FLAGS += -DSHATRANJ -DMAKRUK
+
+include Makefile.mkfamily
+
+mprobe: mtbprobe
+	cp mtbprobe mprobe

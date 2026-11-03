@@ -17,6 +17,7 @@
 #include "defs.h"
 #include "probe.h"
 #include "util.h"
+#include "mkrules.h"
 
 #if defined(SUICIDE)
 // 5-piece:
@@ -33,6 +34,15 @@
 #define TBMAX_PIECE 1260
 #define TBMAX_PAWN 1386
 #define HSHMAX 12
+#elif defined(MAKRUK)
+#ifdef CAMBODIAN
+// all Cambodian tables, also those with pawns, use the raw index
+#define TBMAX_PIECE 8000
+#else
+#define TBMAX_PIECE 2000
+#endif
+#define TBMAX_PAWN 6000
+#define HSHMAX 24
 #elif defined(RACING)
 #define TBMAX_PIECE 1300
 #define TBMAX_PAWN 1
@@ -152,7 +162,14 @@ void add_to_hash(struct TBEntry *ptr, uint64_t key)
   }
 }
 
+#ifndef MAKRUK
 static char pchr[] = {'K', 'Q', 'R', 'B', 'N', 'P'};
+#else
+// Makruk: met (M) uses the QUEEN slot, khon (S) the BISHOP slot.
+// Names list the pieces in the order R S N M P.
+static char pchr[] = {'K', 'R', 'S', 'N', 'M', 'P'};
+static int pchr_type[] = {KING, ROOK, BISHOP, KNIGHT, QUEEN, PAWN};
+#endif
 
 static void init_tb(char *str)
 {
@@ -176,14 +193,23 @@ static void init_tb(char *str)
     case 'N':
       pcs[KNIGHT | color]++;
       break;
+#ifndef MAKRUK
     case 'B':
       pcs[BISHOP | color]++;
       break;
-    case 'R':
-      pcs[ROOK | color]++;
-      break;
     case 'Q':
       pcs[QUEEN | color]++;
+      break;
+#else
+    case 'S':
+      pcs[BISHOP | color]++;
+      break;
+    case 'M':
+      pcs[QUEEN | color]++;
+      break;
+#endif
+    case 'R':
+      pcs[ROOK | color]++;
       break;
     case 'K':
       pcs[KING | color]++;
@@ -200,7 +226,11 @@ static void init_tb(char *str)
     key += (tb_piece_key[i+1]*pcs[i+1]) + (tb_piece_key[i+9]*pcs[i+9]);
     key2 += (tb_piece_key[i+1]*pcs[i+9]) + (tb_piece_key[i+9]*pcs[i+1]);
   }
+#ifdef CAMBODIAN
+  if (1) {
+#else
   if (pcs[WPAWN] + pcs[BPAWN] == 0) {
+#endif
     if (TBnum_piece == TBMAX_PIECE) {
       fprintf(stderr, "TBMAX_PIECE limit too low!\n");
       exit(1);
@@ -224,7 +254,11 @@ static void init_tb(char *str)
   // no color symmetry in Racing Kings: KRvK and KvKR are different tables
   entry->symmetric = 0;
 #endif
+#ifdef CAMBODIAN
+  entry->has_pawns = 0;
+#else
   entry->has_pawns = (pcs[WPAWN] + pcs[BPAWN] > 0);
+#endif
 
   if (entry->has_pawns) {
     struct TBEntry_pawn *ptr = (struct TBEntry_pawn *)entry;
@@ -236,6 +270,10 @@ static void init_tb(char *str)
     }
   } else {
     struct TBEntry_piece *ptr = (struct TBEntry_piece *)entry;
+#ifdef MAKRUK
+    strcpy(ptr->name, str);
+    ptr->dtz_ready = 0;
+#endif
 #ifdef RACING
     (void)j;
     ptr->enc_type = 1;
@@ -258,6 +296,40 @@ static void init_tb(char *str)
   if (key2 != key) add_to_hash(entry, key2);
 #endif
 }
+
+#ifdef MAKRUK
+// Enumerate all material combinations. Both colour orders are tried, so
+// whichever of e.g. KRvKN and KNvKR exists on disk is registered.
+static int mk_num_sides;
+static char mk_sides[512][TBPIECES];
+
+static void mk_gen_sides(char *buf, int len, int min_type, int max_len)
+{
+  buf[len] = 0;
+  strcpy(mk_sides[mk_num_sides++], buf);
+  if (len == max_len) return;
+  for (int t = min_type; t < 6; t++) {
+    buf[len] = pchr[t];
+    mk_gen_sides(buf, len + 1, t, max_len);
+  }
+}
+
+static void makruk_init_all(void)
+{
+  char buf[TBPIECES + 1];
+  char str[2 * TBPIECES + 4];
+
+  mk_num_sides = 0;
+  mk_gen_sides(buf, 0, 1, TBPIECES - 2);
+  for (int a = 0; a < mk_num_sides; a++)
+    for (int b = 0; b < mk_num_sides; b++) {
+      int la = strlen(mk_sides[a]), lb = strlen(mk_sides[b]);
+      if (la + lb == 0 || la + lb > TBPIECES - 2) continue;
+      sprintf(str, "K%svK%s", mk_sides[a], mk_sides[b]);
+      init_tb(str);
+    }
+}
+#endif
 
 #ifdef RACING
 // Enumerate all tables K<white>vK<black> with at most TBPIECES pieces.
@@ -330,7 +402,13 @@ void init_tablebases(void)
       j++;
   }
 
-#if defined(RACING)
+#if defined(MAKRUK)
+  (void)str; (void)i; (void)j; (void)k; (void)l;
+#if TBPIECES == 7
+  (void)m;
+#endif
+  makruk_init_all();
+#elif defined(RACING)
   (void)i; (void)j; (void)k; (void)l;
   str[0] = 'K';
   init_racing(str, 1, 1, 0, TBPIECES - 2);
@@ -2065,6 +2143,13 @@ void setup_pieces_piece(struct TBEntry_piece *ptr, uint8_t *data,
 
   for (i = 0; i < ptr->num; i++)
     ptr->pieces[0][i] = data[i + 1] & 0x0f;
+#ifdef MAKRUK
+  // raw mirror-symmetric index, see docs/variants/makruk.md
+  (void)order;
+  for (i = 0; i < ptr->num; i++)
+    ptr->pieces[1][i] = data[i + 1] >> 4;
+  tb_size[0] = tb_size[1] = MK_RAW_SIZE(ptr->num);
+#else
   order = data[0] & 0x0f;
   ptr->order[0] = order;
   set_norm_piece(ptr, ptr->norm[0], ptr->pieces[0], order);
@@ -2076,6 +2161,7 @@ void setup_pieces_piece(struct TBEntry_piece *ptr, uint8_t *data,
   ptr->order[1] = order;
   set_norm_piece(ptr, ptr->norm[1], ptr->pieces[1], order);
   tb_size[1] = calc_factors_piece(ptr->factor[1], ptr->num, order, ptr->norm[1], ptr->enc_type);
+#endif
 }
 
 void setup_pieces_pawn(struct TBEntry_pawn *ptr, uint8_t *data,
@@ -2270,7 +2356,11 @@ static char *prt_str(char *str, uint64_t key)
 {
   int i, k;
   for (i = 0; i < 6; i++) {
+#ifndef MAKRUK
     k = (key >> (4 * (5-i))) & 0x0f;
+#else
+    k = pchr_type[i] == KING ? 0 : (key >> (4 * (pchr_type[i] - 1))) & 0x0f;
+#endif
     while (k--)
       *str++ = pchr[i];
   }
@@ -2738,7 +2828,11 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
       pos[i] = gpos[j++];
       if (i < entry->num && pc[i] != pc[i + 1]) j = 0;
     }
+#ifdef MAKRUK
+    idx = mk_probe_index(pos, pc, entry->num, mirror);
+#else
     idx = encode_piece(entry, entry->norm[bside], pos, entry->factor[bside]);
+#endif
     res = decompress_pairs(entry->precomp[bside], idx);
   } else {
     struct TBEntry_pawn *entry = (struct TBEntry_pawn *)ptr;
@@ -2759,6 +2853,244 @@ int probe_table(int *restrict pieces, int *restrict gpos, int wtm)
   return ((int)res) - 2;
 }
 
+#ifdef MAKRUK
+// DTZ tables of Makruk pawnless tables (see docs/variants/makruk.md). Only
+// one side to move is stored; the flags of the sub-table say which one.
+static void mk_init_dtz(struct TBEntry_piece *ptr)
+{
+  char name[256];
+  FD fd = FD_ERR;
+  uint64_t size[6];
+  uint8_t *next;
+
+  for (int i = 0; i < numPaths && fd == FD_ERR; i++) {
+    strcpy(name, paths[i]);
+    strcat(name, "/");
+    strcat(name, ptr->name);
+    strcat(name, DTZSUFFIX);
+    fd = open_file(name);
+  }
+  if (fd == FD_ERR) {
+    fprintf(stderr, "Failed to open %s%s.\n", ptr->name, DTZSUFFIX);
+    exit(EXIT_FAILURE);
+  }
+  map_t dummy;
+  uint8_t *data = map_file(fd, true, &dummy);
+  close_file(fd);
+
+  if (((uint32_t *)data)[0] != DTZ_MAGIC) {
+    fprintf(stderr, "Corrupted table %s%s.\n", ptr->name, DTZSUFFIX);
+    exit(EXIT_FAILURE);
+  }
+  int num = ptr->num;
+  int sides = (data[4] & 0x01) ? 2 : 1;
+  uint64_t tb_size = MK_RAW_SIZE(num);
+  data += 5;
+  for (int s = 0; s < sides; s++) {
+    data++; // order byte (unused)
+    for (int i = 0; i < num; i++)
+      ptr->dtz_pieces[s][i] = data[i];
+    data += num;
+  }
+  data += ((uintptr_t)data) & 0x01;
+
+  for (int s = 0; s < sides; s++) {
+    ptr->dtz_flags[s] = data[0];
+    ptr->dtz_precomp[s] = setup_pairs(data, tb_size, &size[3 * s], &next);
+    data = next;
+  }
+
+  for (int s = 0; s < sides; s++) {
+    ptr->dtz_map[s][0] = ptr->dtz_map[s][1] = NULL;
+    if (ptr->dtz_flags[s] & 2) {
+      for (int j = 0; j < 4; j++) {
+        if (j < 2)
+          ptr->dtz_map[s][j] = data + 1;
+        data += 1 + data[0];
+      }
+    }
+  }
+  data += ((uintptr_t)data) & 0x01;
+
+  for (int s = 0; s < sides; s++) {
+    ptr->dtz_precomp[s]->indextable = (char *)data;
+    data += size[3 * s];
+  }
+  for (int s = 0; s < sides; s++) {
+    ptr->dtz_precomp[s]->sizetable = (uint16_t *)data;
+    data += size[3 * s + 1];
+  }
+  for (int s = 0; s < sides; s++) {
+    data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+    ptr->dtz_precomp[s]->data = data;
+    data += size[3 * s + 2];
+  }
+  ptr->dtz_side = ptr->dtz_flags[0] & 0x01;
+}
+
+// does a piece of colour c (0 white, 8 black) attack sq?
+static int mk_attacked(int *pieces, int *gpos, int sq, int c, bitboard occ)
+{
+  for (int i = 0; i < numpcs; i++) {
+    int t = pieces[i];
+    if (t && (t & 0x08) == c && (PieceRange(gpos[i], t, occ) & bit[sq]))
+      return 1;
+  }
+  return 0;
+}
+
+static int mk_num_pieces(int *pieces, int c)
+{
+  int n = 0;
+  for (int i = 0; i < numpcs; i++)
+    if (pieces[i] && (pieces[i] & 0x08) == c && (pieces[i] & 0x07) != KING)
+      n++;
+  return n;
+}
+
+// D for the side to move that is not stored in the DTZ file: search all
+// moves. Non-captures lead to positions of the stored side. Captures and
+// promotions lead to subtables (the count continues), unless they start a
+// fresh count (see mk_fresh_count()) or, for ASEAN, reset the 50-move
+// counter; then the WDL value of the resulting position decides.
+static int mk_dtz_search(int *pieces, int *gpos, int wtm, int wdl)
+{
+  int us = wtm ? 0 : 8, them = us ^ 8;
+  int best = wdl > 0 ? INT32_MAX : 0;
+  int king = 0, pawns = 0;
+  bitboard occ = 0, own = 0;
+
+  for (int i = 0; i < numpcs; i++)
+    if (pieces[i]) {
+      occ |= bit[gpos[i]];
+      if ((pieces[i] & 0x07) == PAWN) pawns++;
+      if ((pieces[i] & 0x08) == us) {
+        own |= bit[gpos[i]];
+        if ((pieces[i] & 0x07) == KING) king = i;
+      }
+    }
+  int us_num = mk_num_pieces(pieces, us);
+  int them_num = mk_num_pieces(pieces, them);
+
+  for (int j = 0; j < numpcs; j++) {
+    int t = pieces[j];
+    if (!t || (t & 0x08) != us) continue;
+    int from = gpos[j];
+    int pawn = (t & 0x07) == PAWN;
+    bitboard bb = PieceRange(from, t, occ) & ~own;
+    if (pawn) {
+      int to = from + (us ? -8 : 8);
+      bb = (bb & occ) | ((occ & bit[to]) ? 0 : bit[to]);
+    }
+    while (bb) {
+      int to = FirstOne(bb);
+      ClearFirst(bb);
+      int m = -1;
+      if (occ & bit[to]) {
+        for (m = 0; m < numpcs; m++)
+          if (pieces[m] && gpos[m] == to) break;
+        if ((pieces[m] & 0x07) == KING) continue;
+      }
+      int promo = pawn && (to >> 3) == MK_PROMO_RANK(us >> 3);
+      int cap = m >= 0 ? pieces[m] : 0;
+      bitboard occ2 = (occ & ~bit[from]) | bit[to];
+      if (m >= 0) pieces[m] = 0;
+      if (promo) pieces[j] = QUEEN | us;
+      gpos[j] = to;
+      if (!mk_attacked(pieces, gpos, gpos[king], them, occ2)) {
+        int r; // result for us: > 0 win in r, < 0 loss in -r, 0 draw
+        int them_left = them_num - (m >= 0);
+        int pawns_left = pawns - ((cap & 0x07) == PAWN) - promo;
+        if (m >= 0 && MK_CAPTURE_RESETS(us_num > 0 && them_num > 0)) {
+          // fresh 50-move counter: a losing capture loses at once (D = 0)
+          int w = probe_table(pieces, gpos, !wtm);
+          r = w < 0 ? 1 : 0;
+        } else if ((m >= 0 || promo) && !us_num && !them_left)
+          r = 0; // bare kings
+        else if ((m >= 0 || promo)
+            && mk_fresh_count(us_num, them_left, pawns_left,
+              (cap & 0x07) == PAWN)) {
+          // fresh count: a losing move loses at once (D = 0)
+          r = probe_table(pieces, gpos, !wtm) < 0 ? 1 : 0;
+        } else {
+          // probe WDL first: a mated position has D = 0 like a draw
+          int w = probe_table(pieces, gpos, !wtm);
+          int d = w ? probe_dtz_makruk(pieces, gpos, !wtm) : 0;
+          r = w < 0 ? -d + 1 : w > 0 ? -(d + 1) : 0;
+        }
+        if (wdl > 0 && r > 0 && r < best) best = r;
+        if (wdl < 0 && r < 0 && -r > best) best = -r;
+      }
+      gpos[j] = from;
+      pieces[j] = t;
+      if (m >= 0) pieces[m] = cap;
+    }
+  }
+
+  return wdl > 0 ? best : -best;
+}
+
+// Returns the signed counting distance D (plies) of a pawnless position,
+// positive if the side to move wins, or 0 if it is drawn with a fresh count
+// or checkmated (use probe_table() to tell these apart).
+int probe_dtz_makruk(int *restrict pieces, int *restrict gpos, int wtm)
+{
+  uint64_t key = 0ULL;
+  int i, j;
+  int pos[TBPIECES];
+
+  int wdl = probe_table(pieces, gpos, wtm);
+  if (!wdl) return 0;
+
+  for (i = 0; i < numpcs; i++)
+    key += tb_piece_key[pieces[i]];
+  struct TBHashEntry *ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
+  for (i = 0; i < HSHMAX; i++)
+    if (ptr2[i].key == key) break;
+  struct TBEntry_piece *entry = (struct TBEntry_piece *)ptr2[i].ptr;
+  if (!entry->dtz_ready) {
+    LOCK(TB_mutex);
+    if (!entry->dtz_ready) {
+      mk_init_dtz(entry);
+      entry->dtz_ready = 1;
+    }
+    UNLOCK(TB_mutex);
+  }
+
+  int bside, mirror, cmirror;
+  if (!entry->symmetric) {
+    if ((uint32_t)key != entry->key) {
+      cmirror = 8;
+      mirror = 0x38;
+      bside = wtm;
+    } else {
+      cmirror = mirror = 0;
+      bside = !wtm;
+    }
+  } else {
+    cmirror = wtm ? 0 : 8;
+    mirror = wtm ? 0 : 0x38;
+    bside = 0;
+  }
+
+  if (bside != entry->dtz_side)
+    return mk_dtz_search(pieces, gpos, wtm, wdl);
+
+  uint8_t *pc = entry->dtz_pieces[0];
+  for (i = 0, j = 0; i < entry->num; i++) {
+    for (; pieces[j] != (pc[i] ^ cmirror); j++);
+    pos[i] = gpos[j++];
+    if (i < entry->num && pc[i] != pc[i + 1]) j = 0;
+  }
+  uint64_t idx = mk_probe_index(pos, pc, entry->num, mirror);
+  int v = decompress_pairs(entry->dtz_precomp[0], idx);
+  if (entry->dtz_flags[0] & 2)
+    v = entry->dtz_map[0][wdl > 0 ? 0 : 1][v];
+  // wins are stored as D - 1, losses as D (so that mates can be stored)
+  return wdl > 0 ? v + 1 : -v;
+}
+#endif
+
 #if defined(REGULAR)
 int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
              int alpha, int beta)
@@ -2766,6 +3098,16 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
   int i, j, k, s, t;
   int sq, sq2;
   bitboard bb;
+
+#ifdef ASEAN
+  // pawnless tables store all positions explicitly
+  // (see docs/variants/makruk.md)
+  for (i = 0; i < numpcs; i++)
+    if ((pieces[i] & 0x07) == PAWN)
+      break;
+  if (i == numpcs)
+    return probe_table(pieces, gpos, wtm);
+#endif
 
   if (wtm) {
     for (i = 0; i < numpcs; i++) {
@@ -2856,6 +3198,115 @@ int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
             if (v > alpha)
               alpha = v;
           }
+        }
+        gpos[j] = tmp;
+        pieces[i] = s;
+        if (alpha >= beta)
+          return alpha;
+      }
+    }
+  }
+
+  int v = probe_table(pieces, gpos, wtm);
+  return alpha > v ? alpha : v;
+}
+#elif defined(MAKRUK)
+int probe_tb(int *restrict pieces, int *restrict gpos, int wtm, bitboard occ,
+             int alpha, int beta)
+{
+  int i, j, k, s, t;
+  int sq, sq2;
+  bitboard bb;
+
+  // Pawnless tables store all positions explicitly: captures do not reset
+  // the counting rules, so no capture search must be done.
+#ifdef CAMBODIAN
+  // the same holds for all Cambodian tables
+  return probe_table(pieces, gpos, wtm);
+#endif
+  for (i = 0; i < numpcs; i++)
+    if ((pieces[i] & 0x07) == PAWN)
+      break;
+  if (i == numpcs)
+    return probe_table(pieces, gpos, wtm);
+
+  if (wtm) {
+    for (i = 0; i < numpcs; i++) {
+      if (i == black_king) continue;
+      s = pieces[i];
+      if (!(s & 0x08)) continue;
+      sq = gpos[i];     /* square of piece to be captured */
+      for (j = 0; j < numpcs; j++) {
+        t = pieces[j];
+        if (!t || (t & 0x08)) continue;
+        sq2 = gpos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+// alternatively, change pieces around
+        pieces[i] = 0;
+        int tmp = gpos[j];
+        gpos[j] = gpos[i];
+// now check whether move was legal, i.e. white king not in check
+        int king_sq = gpos[white_king];
+        bb = occ & ~bit[sq2];
+        for (k = 0; k < numpcs; k++) {
+          t = pieces[k];
+          if (!(t & 0x08)) continue;
+          int sq3 = gpos[k];
+          if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
+        }
+        if (k == numpcs) { // not in check
+          int v;
+          if (pieces[j] == WPAWN && gpos[j] >= 0x28) {
+            pieces[j] = WQUEEN;
+            v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
+            pieces[j] = WPAWN;
+          } else {
+            v = -probe_tb(pieces, gpos, 0, bb, -beta, -alpha);
+          }
+          if (v > alpha)
+            alpha = v;
+        }
+        gpos[j] = tmp;
+        pieces[i] = s;
+        if (alpha >= beta)
+          return alpha;
+      }
+    }
+  } else {
+    for (i = 0; i < numpcs; i++) {
+      if (i == white_king) continue;
+      s = pieces[i];
+      if (!s || (s & 0x08)) continue;
+      sq = gpos[i];     /* square of piece to be captured */
+      for (j = 0; j < numpcs; j++) {
+        t = pieces[j];
+        if (!(t & 0x08)) continue;
+        sq2 = gpos[j];
+        if (!(bit[sq] & PieceRange(sq2, t, occ))) continue;
+// alternatively, change pieces around
+        pieces[i] = 0;
+        int tmp = gpos[j];
+        gpos[j] = gpos[i];
+// now check whether move was legal, i.e. white king not in check
+        int king_sq = gpos[black_king];
+        bb = occ & ~bit[sq2];
+        for (k = 0; k < numpcs; k++) {
+          t = pieces[k];
+          if (!t || (t & 0x08)) continue;
+          int sq3 = gpos[k];
+          if (bit[king_sq] & PieceRange(sq3, t, bb)) break;
+        }
+        if (k == numpcs) {
+          int v;
+          if (pieces[j] == BPAWN && gpos[j] < 0x18) {
+            pieces[j] = BQUEEN;
+            v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
+            pieces[j] = BPAWN;
+          } else {
+            v = -probe_tb(pieces, gpos, 1, bb, -beta, -alpha);
+          }
+          if (v > alpha)
+            alpha = v;
         }
         gpos[j] = tmp;
         pieces[i] = s;
@@ -3602,6 +4053,7 @@ static __attribute__ ((noinline)) void probe_failed(int *pieces)
 
   LOCK(fail_mutex);
   k = 0;
+#ifndef MAKRUK
   for (i = 0; i < 6; i++)
     for (j = 0; j < numpcs; j++)
       if (pieces[j] ==  WKING - i)
@@ -3611,6 +4063,17 @@ static __attribute__ ((noinline)) void probe_failed(int *pieces)
     for (j = 0; j < numpcs; j++)
       if (pieces[j] == BKING - i)
         str[k++] = pchr[i];
+#else
+  for (i = 0; i < 6; i++)
+    for (j = 0; j < numpcs; j++)
+      if (pieces[j] == pchr_type[i])
+        str[k++] = pchr[i];
+  str[k++] = 'v';
+  for (i = 0; i < 6; i++)
+    for (j = 0; j < numpcs; j++)
+      if (pieces[j] == (pchr_type[i] | 0x08))
+        str[k++] = pchr[i];
+#endif
   str[k] = 0;
   fprintf(stderr, "Missing table: %s\n", str);
   fprintf(stderr, "Did you set "TBPATH" correctly?\n");

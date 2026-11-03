@@ -25,6 +25,12 @@ jobs:
             targets: gtbgen gtbgenp gtbver gtbverp tbcheck
           - variant: shatranj
             targets: jtbgen jtbgenp jtbver jtbverp tbcheck
+          - variant: makruk
+            targets: mtbgen mtbgenp mtbver mtbverp tbcheck
+          - variant: cambodian
+            targets: cmtbgen cmtbver tbcheck
+          - variant: asean
+            targets: astbgen astbgenp astbver astbverp tbcheck
           - variant: racing
             targets: ktbgen ktbver tbcheck
 

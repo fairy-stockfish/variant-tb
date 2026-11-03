@@ -13,8 +13,11 @@
 
 bitboard bit[64];
 bitboard knight_range[64], king_range[64];
-#ifdef SHATRANJ
+#if defined(SHATRANJ) || defined(MAKRUK)
 bitboard bishop_range[64], queen_range[64];
+#endif
+#ifdef MAKRUK
+bitboard khon_range[2][64];
 #endif
 #ifdef HAS_PAWNS
 bitboard pawn_range[2][64];
@@ -37,7 +40,7 @@ void set_up_tables(void)
 	     Kx[] = {-1, 0, 1, 1, 1, 0, -1, -1},
 	     Ky[] = {1, 1, 1, 0, -1, -1, -1, 0};
 
-#ifdef SHATRANJ
+#if defined(SHATRANJ) || defined(MAKRUK)
   static int Bx[] = {2, 2, -2, -2},
 	     By[] = {2, -2, 2, -2},
 	     Qx[] = {1, 1, -1, -1},
@@ -84,7 +87,7 @@ void set_up_tables(void)
 	bits |= bit[x + Kx[i] + 8 * (y + Ky[i])];
     king_range[sq] = bits;
 
-#ifdef SHATRANJ
+#if defined(SHATRANJ) || defined(MAKRUK)
     bits = 0;
     for (i = 0; i < 4; i++)
       if (x + Bx[i] >= 0 && x + Bx[i] < 8 && y + By[i] >= 0 && y + By[i] < 8)
@@ -96,6 +99,12 @@ void set_up_tables(void)
       if (x + Qx[i] >= 0 && x + Qx[i] < 8 && y + Qy[i] >= 0 && y + Qy[i] < 8)
 	bits |= bit[x + Qx[i] + 8 * (y + Qy[i])];
     queen_range[sq] = bits;
+#endif
+
+#ifdef MAKRUK
+    // diagonal steps (= queen_range, i.e. ferz) plus one step forward
+    khon_range[0][sq] = queen_range[sq] | (y < 7 ? bit[sq + 8] : 0);
+    khon_range[1][sq] = queen_range[sq] | (y > 0 ? bit[sq - 8] : 0);
 #endif
 
 #ifdef ATOMIC
