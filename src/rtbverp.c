@@ -1167,7 +1167,7 @@ void calc_captures_w(void)
 #endif
 
   for (i = 0; i < n; i++) { // loop over black pieces
-    if (!(pt[i] & 0x08) || i == black_king) continue;
+    if (!(pt[i] & BLACK_BIT) || i == black_king) continue;
     for (k = 0, j = 0; black_all[k] >= 0; k++)
       if (black_all[k] != i)
         pcs2[j++] = black_all[k];
@@ -1197,7 +1197,7 @@ void calc_captures_b(void)
 #endif
 
   for (i = 0; i < n; i++) { // loop over white pieces
-    if ((pt[i] & 0x08) || i == white_king) continue;
+    if ((pt[i] & BLACK_BIT) || i == white_king) continue;
     for (k = 0, j = 0; white_all[k] >= 0; k++)
       if (white_all[k] != i)
         pcs2[j++] = white_all[k];
@@ -1226,9 +1226,9 @@ int probe_pawn_capt(int k, int sq, uint64_t idx, int king, int clr, int wtm, bit
       int sq2 = FirstOne(bits);
       int t;
       for (t = 0; p[t] != sq2; t++);
-      if ((pt[t] & 0x08) == clr) continue;
+      if ((pt[t] & BLACK_BIT) == clr) continue;
       for (i = 0, m = 0; i < numpcs; i++)
-        if (i != t && ((pt[i] & 0x08) != clr))
+        if (i != t && ((pt[i] & BLACK_BIT) != clr))
           pcs[m++] = i;
       pcs[m] = -1;
       if (is_attacked(p[king], pcs, occ, p)) continue;
@@ -1247,9 +1247,9 @@ int probe_pawn_capt(int k, int sq, uint64_t idx, int king, int clr, int wtm, bit
       int sq2 = FirstOne(bits);
       int t;
       for (t = 0; p[t] != sq2; t++);
-      if ((pt[t] & 0x08) == clr) continue;
+      if ((pt[t] & BLACK_BIT) == clr) continue;
       for (i = 0, m = 0; i < numpcs; i++)
-        if (i != t && (pt[i] & 0x08) != clr) pcs[m++] = i;
+        if (i != t && (pt[i] & BLACK_BIT) != clr) pcs[m++] = i;
       pcs[m] = -1;
       if (is_attacked(p[king], pcs, occ, p)) continue;
       for (i = 0; i < numpcs; i++) {
@@ -1258,8 +1258,8 @@ int probe_pawn_capt(int k, int sq, uint64_t idx, int king, int clr, int wtm, bit
       }
       pt2[t] = 0;
       pos[k] = sq2;
-      for (m = QUEEN; m >= KNIGHT; m--) {
-        pt2[k] = m | (pt[k] & 0x08);
+      PROMO_LOOP(m, 0) {
+        pt2[k] = m | (pt[k] & BLACK_BIT);
         v = -probe_tb(pt2, pos, wtm, occ, -2, 2);
         if (v > 1) return v;
         if (v > best) best = v;
@@ -1300,7 +1300,7 @@ void calc_pawn_captures_b(struct thread_data *thread)
     int v = -CAPT_DRAW;
     for (i = 0; i < numpawns; i++) {
       if (pw[i]) continue; // loop through black pawns
-      int val = probe_pawn_capt(i, p[i] - 0x08, idx & ~mask[i], black_king, 8, 1, occ & ~bit[p[i]], p);
+      int val = probe_pawn_capt(i, p[i] - 0x08, idx & ~mask[i], black_king, BLACK_BIT, 1, occ & ~bit[p[i]], p);
       if (val > v) v = val;
     }
     v += CAPT_DRAW;
@@ -1606,7 +1606,7 @@ static int eval_ep(int k, int l, int sq, int ep, int king, int clr, int wtm, bit
     pt2[i] = pt[i];
   pt2[k] = 0;
   for (i = 0, m = 0; i < numpcs; i++)
-    if (i != k && (pt[i] & 0x08) != clr)
+    if (i != k && (pt[i] & BLACK_BIT) != clr)
       pcs[m++] = i;
   pcs[m] = -1;
   v = 3;
@@ -1650,7 +1650,7 @@ void calc_pawn_moves_w(struct thread_data *thread)
         }
         pos[i] = sq + 8;
         if (best < -2) best = -2;
-        for (k = WQUEEN; k >= WKNIGHT; k--) {
+        PROMO_LOOP(k, 0) {
           pt2[i] = k;
           int v = -probe_tb(pt2, pos, 0, bb, -2, -best);
           if (v > best) {
@@ -1673,7 +1673,7 @@ void calc_pawn_moves_w(struct thread_data *thread)
             int sq2 = FirstOne(bits);
             for (k = 0; p[k] != sq2; k++);
             if (pt[k] == BPAWN) {
-              v0 = eval_ep(i, k, sq2, p[i] + 0x08, black_king, 8, 1, occ, p);
+              v0 = eval_ep(i, k, sq2, p[i] + 0x08, black_king, BLACK_BIT, 1, occ, p);
               if (v0 < v1) v1 = v0;
             }
             ClearFirst(bits);
@@ -1729,7 +1729,7 @@ void calc_pawn_moves_b(struct thread_data *thread)
         }
         pos[i] = sq - 8;
         if (best < -2) best = -2;
-        for (k = BQUEEN; k >= BKNIGHT; k--) {
+        PROMO_LOOP(k, BLACK_BIT) {
           pt2[i] = k;
           int v = -probe_tb(pt2, pos, 1, bb, -2, -best);
           if (v > best) {

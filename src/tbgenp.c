@@ -830,7 +830,7 @@ int main(int argc, char **argv)
   int i, j;
   int color;
   int val, longindex;
-  int pcs[16];
+  int pcs[NUM_PC];
   int save_stats = 0;
   int save_to_disk = 0;
   int compress_wide = 0;
@@ -880,7 +880,7 @@ int main(int argc, char **argv)
 
   init_tablebases();
 
-  for (i = 0; i < 16; i++)
+  for (i = 0; i < NUM_PC; i++)
     pcs[i] = 0;
 
   numpcs = strlen(tablename) - 1;
@@ -908,13 +908,23 @@ int main(int argc, char **argv)
       pcs[QUEEN | color]++;
       pt[j++] = QUEEN | color;
       break;
+#ifdef SCHESS
+    case 'H':
+      pcs[HAWK | color]++;
+      pt[j++] = HAWK | color;
+      break;
+    case 'E':
+      pcs[ELEPHANT | color]++;
+      pt[j++] = ELEPHANT | color;
+      break;
+#endif
     case 'K':
       pcs[KING | color]++;
       pt[j++] = KING | color;
       break;
     case 'v':
       if (color) exit(1);
-      color = 0x08;
+      color = BLACK_BIT;
       break;
     default:
       exit(1);
@@ -940,7 +950,7 @@ int main(int argc, char **argv)
   int numw = 0, numb = 0;
   for (int i = PAWN; i <= QUEEN; i++) {
     numw += pcs[i];
-    numb += pcs[i | 8];
+    numb += pcs[i | BLACK_BIT];
   }
   if (numw == 0 || numb == 0) {
     fprintf(stderr, "Bare king.\n");
@@ -961,7 +971,7 @@ int main(int argc, char **argv)
 
   // move pieces to back
   for (i = j = numpcs - 1; i >= numpawns; i--, j--) {
-    while ((pt[j] & 0x07) == 1) j--;
+    while ((pt[j] & TYPE_MASK) == PAWN) j--;
     pt[i] = pt[j];
   }
   if (pcs[WPAWN] > 0 && (pcs[BPAWN] == 0 || pcs[WPAWN] <= pcs[BPAWN])) {
@@ -1002,10 +1012,7 @@ int main(int argc, char **argv)
   work_part = alloc_work(total_work);
 
 #if 1
-  static int piece_order[16] = {
-    0, 0, 3, 5, 7, 9, 1, 0,
-    0, 0, 4, 6, 8, 10, 2, 0
-  };
+  static int piece_order[NUM_PC] = PIECE_ORDER_INIT;
 
   for (i = numpawns; i < numpcs; i++)
     for (j = i + 1; j < numpcs; j++)
@@ -1021,12 +1028,12 @@ int main(int argc, char **argv)
     if (pt[i] == WKING) break;
   white_all[j++] = i;
   for (i = 0; i < numpcs; i++)
-    if (!(pt[i] & 0x08) && pt[i] != WKING)
+    if (!(pt[i] & BLACK_BIT) && pt[i] != WKING)
       white_all[j++] = i;
   white_all[j] = -1;
 #else
   for (i = 0, j = 0; i < numpcs; i++)
-    if (!(pt[i] & 0x08))
+    if (!(pt[i] & BLACK_BIT))
       white_all[j++] = i;
   white_all[j] = -1;
 #endif
@@ -1036,23 +1043,23 @@ int main(int argc, char **argv)
     if (pt[i] == BKING) break;
   black_all[j++] = i;
   for (i = 0; i < numpcs; i++)
-    if ((pt[i] & 0x08) && pt[i] != BKING)
+    if ((pt[i] & BLACK_BIT) && pt[i] != BKING)
       black_all[j++] = i;
   black_all[j] = -1;
 #else
   for (i = 0, j = 0; i < numpcs; i++)
-    if (pt[i] & 0x08)
+    if (pt[i] & BLACK_BIT)
       black_all[j++] = i;
   black_all[j] = -1;
 #endif
 
   for (i = 0, j = 0; i < numpcs; i++)
-    if (!(pt[i] & 0x08) && pt[i] != 0x01)
+    if (!(pt[i] & BLACK_BIT) && pt[i] != WPAWN)
       white_pcs[j++] = i;
   white_pcs[j] = -1;
 
   for (i = 0, j = 0; i < numpcs; i++)
-    if ((pt[i] & 0x08) && pt[i] != 0x09)
+    if ((pt[i] & BLACK_BIT) && pt[i] != BPAWN)
       black_pcs[j++] = i;
   black_pcs[j] = -1;
 
@@ -1087,7 +1094,7 @@ int main(int argc, char **argv)
   // FICS rules (if stalemate, the player with less material wins)
   int stalemate = 0;
   for (i = 0; i < numpcs; i++)
-    stalemate += (pt[i] & 0x08) ? 1 : -1;
+    stalemate += (pt[i] & BLACK_BIT) ? 1 : -1;
   if (stalemate > 0) {
     stalemate_w = STALE_WIN;
     stalemate_b = BASE_LOSS;
@@ -1104,19 +1111,19 @@ int main(int argc, char **argv)
   last_w = -1;
   j = 0;
   for (i = 0; i < numpcs; i++)
-    if (!(pt[i] & 0x08)) j++;
+    if (!(pt[i] & BLACK_BIT)) j++;
   if (j == 1) {
     for (i = 0; i < numpcs; i++)
-      if (!(pt[i] & 0x08)) break;
+      if (!(pt[i] & BLACK_BIT)) break;
     last_w = i;
   }
   last_b = -1;
   j = 0;
   for (i = 0; i < numpcs; i++)
-    if (pt[i] & 0x08) j++;
+    if (pt[i] & BLACK_BIT) j++;
   if (j == 1) {
     for (i = 0; i < numpcs; i++)
-      if (pt[i] & 0x08) break;
+      if (pt[i] & BLACK_BIT) break;
     last_b = i;
   }
 
@@ -1148,9 +1155,9 @@ int main(int argc, char **argv)
   gettimeofday(&start_time, NULL);
   cur_time = start_time;
 
-  for (i = 0; i < 8; i++)
-    if (pcs[i] != pcs[i + 8]) break;
-  symmetric = (i == 8);
+  for (i = 0; i < BLACK_BIT; i++)
+    if (pcs[i] != pcs[i + BLACK_BIT]) break;
+  symmetric = (i == BLACK_BIT);
   split = !symmetric;
 
   struct tb_handle *G, *H;

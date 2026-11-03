@@ -27,6 +27,8 @@ jobs:
             targets: jtbgen jtbgenp jtbver jtbverp tbcheck
           - variant: racing
             targets: ktbgen ktbver tbcheck
+          - variant: schess
+            targets: etbgen etbgenp etbver etbverp tbcheck
 
     steps:
       - uses: actions/checkout@v4

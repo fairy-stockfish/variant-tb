@@ -481,7 +481,7 @@ uint64_t NAME(estimate_piece_dtz)(int *pcs, int *pt, T *table, uint8_t *best,
   uint64_t estim = NAME(estimate_compression)(table, bestp, pcs, 0, -1);
 
   for (i = 0; i < entry_piece.num; i++)
-    best[i] = pt[piece_perm_list[*bestp][i]];
+    best[i] = PC_TO_NIBBLE(pt[piece_perm_list[*bestp][i]]);
   best[0] |= order_list[*bestp] << 4;
 
   printf("best order: %d", best[0] >> 4);
@@ -515,7 +515,7 @@ uint64_t NAME(estimate_pawn_dtz)(int *pcs, int *pt, T *table, uint8_t *best,
   uint64_t estim = NAME(estimate_compression)(table, bestp, pcs, 0, file);
 
   for (i = 0; i < entry_pawn.num; i++)
-    best[i] = pt[piece_perm_list[*bestp][i]];
+    best[i] = PC_TO_NIBBLE(pt[piece_perm_list[*bestp][i]]);
   best[0] |= order_list[*bestp] << 4;
   best[1] |= order2_list[*bestp] << 4;
 

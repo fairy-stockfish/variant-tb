@@ -4,7 +4,14 @@
   This file is distributed under the terms of the GNU GPL, version 2.
 */
 
+#ifndef SCHESS
 static char pc[] = { 0, 'P', 'N', 'B', 'R', 'Q', 'K', 0, 0, 'p', 'n', 'b', 'r', 'q', 'k', 0};
+#else
+static char pc[NUM_PC] = {
+  0, 'P', 'N', 'B', 'R', 'Q', 'K', 'H', 'E', 0, 0, 0, 0, 0, 0, 0,
+  0, 'p', 'n', 'b', 'r', 'q', 'k', 'h', 'e', 0, 0, 0, 0, 0, 0, 0
+};
+#endif
 
 static void print_fen(FILE *F, uint64_t idx, int wtm, int switched)
 {
@@ -545,19 +552,19 @@ static void print_longest(FILE *F, int switched)
   } else {
     if (lcb_ply >= 0) {
       fprintf(F, "Longest cursed win for white: %d ply; ", lcb_ply);
-      print_fen(F, lcb_idx, lcb_clr, 8);
+      print_fen(F, lcb_idx, lcb_clr, BLACK_BIT);
     }
     if (lb_ply >= 0) {
       fprintf(F, "Longest win for white: %d ply; ", lb_ply);
-      print_fen(F, lb_idx, lb_clr, 8);
+      print_fen(F, lb_idx, lb_clr, BLACK_BIT);
     }
     if (lw_ply >= 0) {
       fprintf(F, "Longest win for black: %d ply; ", lw_ply);
-      print_fen(F, lw_idx, lw_clr, 8);
+      print_fen(F, lw_idx, lw_clr, BLACK_BIT);
     }
     if (lcw_ply >= 0) {
       fprintf(F, "Longest cursed win for black: %d ply; ", lcw_ply);
-      print_fen(F, lcw_idx, lcw_clr, 8);
+      print_fen(F, lcw_idx, lcw_clr, BLACK_BIT);
     }
   }
   fprintf(F, "\n");

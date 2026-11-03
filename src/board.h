@@ -55,33 +55,26 @@ extern bitboard atom_mask[64];
 #define BishopRange(x,occ) bishop_range[x]
 #endif
 
-#define PAWN 1
-#define KNIGHT 2
-#define BISHOP 3
-#define ROOK 4
-#define QUEEN 5
-#define KING 6
+// The piece types and codes are defined in types.h.
 
-#define WPAWN 1
-#define WKNIGHT 2
-#define WBISHOP 3
-#define WROOK 4
-#define WQUEEN 5
-#define WKING 6
-
-#define BPAWN 9
-#define BKNIGHT 10
-#define BBISHOP 11
-#define BROOK 12
-#define BQUEEN 13
-#define BKING 14
+#ifdef SCHESS
+#define HawkRange(x,occ) (BishopRange(x,occ) | KnightRange(x))
+#define ElephantRange(x,occ) (RookRange(x,occ) | KnightRange(x))
+#define SCHESS_CASES \
+  case HAWK: \
+    return HawkRange(sq, occ); \
+  case ELEPHANT: \
+    return ElephantRange(sq, occ);
+#else
+#define SCHESS_CASES
+#endif
 
 static __inline__ bitboard PieceRange(int sq, int type, bitboard occ)
 {
-  switch (type & 0x07) {
+  switch (type & TYPE_MASK) {
 #ifdef HAS_PAWNS
   case PAWN:
-    return pawn_range[(type & 0x08) >> 3][sq];
+    return pawn_range[!!(type & BLACK_BIT)][sq];
 #endif
   case KNIGHT:
     return KnightRange(sq);
@@ -91,6 +84,7 @@ static __inline__ bitboard PieceRange(int sq, int type, bitboard occ)
     return RookRange(sq, occ);
   case QUEEN:
     return QueenRange(sq, occ);
+  SCHESS_CASES
   default:
     return KingRange(sq);
   }
@@ -104,7 +98,7 @@ static __inline__ bitboard PieceMoves(int sq, int type, bitboard occ)
 // only used in rtbgenp / rtbverp
 static __inline__ bitboard PieceRange1(int sq, int type, bitboard occ)
 {
-  switch (type & 0x07) {
+  switch (type & TYPE_MASK) {
   case KING:
     return KingRange(sq);
   case KNIGHT:
@@ -115,6 +109,7 @@ static __inline__ bitboard PieceRange1(int sq, int type, bitboard occ)
     return RookRange(sq, occ);
   case QUEEN:
     return QueenRange(sq, occ);
+  SCHESS_CASES
   default:
     assume(0);
   }
@@ -128,7 +123,7 @@ static __inline__ bitboard PieceMoves1(int sq, int type, bitboard occ)
 // only used in rtbgen / rtbver
 static __inline__ bitboard PieceRange2(int sq, int type, bitboard occ)
 {
-  switch (type & 0x07) {
+  switch (type & TYPE_MASK) {
   case KNIGHT:
     return KnightRange(sq);
   case BISHOP:
@@ -137,6 +132,7 @@ static __inline__ bitboard PieceRange2(int sq, int type, bitboard occ)
     return RookRange(sq, occ);
   case QUEEN:
     return QueenRange(sq, occ);
+  SCHESS_CASES
   default:
     assume(0);
   }

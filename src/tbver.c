@@ -152,7 +152,7 @@ int main(int argc, char **argv)
   int i, j;
   int color;
   int val, longindex;
-  int pcs[16];
+  int pcs[NUM_PC];
   int wdl_only = 0;
   int check_huff = 0;
 #ifdef SUICIDE
@@ -192,7 +192,7 @@ int main(int argc, char **argv)
   else
     table = tablename;
 
-  for (i = 0; i < 16; i++)
+  for (i = 0; i < NUM_PC; i++)
     pcs[i] = 0;
 
   numpcs = strlen(table) - 1;
@@ -220,13 +220,23 @@ int main(int argc, char **argv)
       pcs[QUEEN | color]++;
       pt[j++] = QUEEN | color;
       break;
+#ifdef SCHESS
+    case 'H':
+      pcs[HAWK | color]++;
+      pt[j++] = HAWK | color;
+      break;
+    case 'E':
+      pcs[ELEPHANT | color]++;
+      pt[j++] = ELEPHANT | color;
+      break;
+#endif
     case 'K':
       pcs[KING | color]++;
       pt[j++] = KING | color;
       break;
     case 'v':
       if (color) exit(EXIT_FAILURE);
-      color = 0x08;
+      color = BLACK_BIT;
       break;
     default:
       exit(EXIT_FAILURE);
@@ -285,23 +295,20 @@ int main(int argc, char **argv)
 #endif
 #endif
 
-  static int piece_order[16] = {
-    0, 0, 3, 5, 7, 9, 1, 0,
-    0, 0, 4, 6, 8, 10, 2, 0
-  };
+  static int piece_order[NUM_PC] = PIECE_ORDER_INIT;
 
 #ifdef SUICIDE
   j = pt[0];
   for (i = 1; i < numpcs; i++)
     if (piece_order[pt[i]] < piece_order[j])
       j = pt[i];
-  if (j & 0x08) {
+  if (j & BLACK_BIT) {
     for (i = 0; i < numpcs; i++)
-      pt[i] ^= 0x08;
-    for (i = 0; i < 8; i++) {
+      pt[i] ^= BLACK_BIT;
+    for (i = 0; i < BLACK_BIT; i++) {
       int tmp = pcs[i];
-      pcs[i] = pcs[i + 8];
-      pcs[i + 8] = tmp;
+      pcs[i] = pcs[i + BLACK_BIT];
+      pcs[i + BLACK_BIT] = tmp;
     }
     switched = 1;
   }
@@ -316,12 +323,12 @@ int main(int argc, char **argv)
       }
 
   for (i = 0, j = 0; i < numpcs; i++)
-    if (!(pt[i] & 0x08))
+    if (!(pt[i] & BLACK_BIT))
       white_pcs[j++] = i;
   white_pcs[j] = -1;
 
   for (i = 0, j = 0; i < numpcs; i++)
-    if (pt[i] & 0x08)
+    if (pt[i] & BLACK_BIT)
       black_pcs[j++] = i;
   black_pcs[j] = -1;
 

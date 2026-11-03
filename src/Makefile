@@ -55,6 +55,9 @@ jtbgen jtbgenp jtbver jtbverp jclean:
 ktbgen ktbver kclean:
 	@$(MAKE) -f Makefile.racing $@
 
+etbgen etbgenp etbver etbverp eclean:
+	@$(MAKE) -f Makefile.schess $@
+
 #atbgen atbgenp atbver atbverp aclean:
 atomic: atbgen atbgenp atbver atbverp tbcheck
 
@@ -66,9 +69,12 @@ shatranj: jtbgen jtbgenp tbcheck
 
 racing: ktbgen ktbver tbcheck
 
+schess: etbgen etbgenp etbver etbverp tbcheck
+
 .PHONY: rtbgen rtbgenp rtbver rtbverp tbcheck clean \
 	atbgen atbgenp atbver atbverp aclean \
 	stbgen stbgenp stbver stbverp sclean \
 	gtbgen gtbgenp gtbver gtbverp gclean \
 	jtbgen jtbgenp jtbver jtbverp jclean \
-	ktbgen ktbver kclean
+	ktbgen ktbver kclean \
+	etbgen etbgenp etbver etbverp eclean
