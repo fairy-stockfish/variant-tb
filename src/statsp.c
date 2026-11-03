@@ -174,10 +174,20 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
       total_stats[STAT_PAWN_WIN] += stats[PAWN_WIN];
       total_stats[STAT_PAWN_CWIN] += stats[PAWN_CWIN];
       total_stats[STAT_MATE] += stats[MATE];
+#ifndef MISERE
       for (j = 0; j < DRAW_RULE; j++) {
         total_stats[1 + j] += stats[WIN_IN_ONE + j];
         total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
       }
+#else
+      // WIN_IN_ONE is used for checkmated positions, i.e. wins in 0 ply
+      total_stats[0] += stats[WIN_IN_ONE];
+      total_stats[STAT_MATE - 1] += stats[LOSS_IN_ONE];
+      for (j = 1; j < DRAW_RULE; j++) {
+        total_stats[1 + j] += stats[WIN_IN_ONE + j];
+        total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
+      }
+#endif
       for (; j < n; j++) {
         total_stats[1 + j] += stats[WIN_IN_ONE + j + 2];
         total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
@@ -267,6 +277,12 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
 #endif
     if (i >= 0) {
 #ifndef SUICIDE
+#ifdef MISERE
+      // checkmated positions (wins in 0 ply) are stored as WIN_IN_ONE
+      if (local == 0 && i == 0)
+        j = WIN_IN_ONE;
+      else
+#endif
       j = local == 0 ? WIN_IN_ONE + i - 1 : WIN_RED + i - sval;
 #else
       j = (i < 2) ? STALE_WIN + i : BASE_WIN + i;

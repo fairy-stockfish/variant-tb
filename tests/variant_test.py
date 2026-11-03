@@ -62,6 +62,9 @@ VARIANTS = {
     # swapped, so e.g. KRvK and KvKR are separate tables.
     "racing":   Variant("k", "ktb", "KTBPATH", True, 3, 3, pawns=False,
                         color_symmetry=False),
+    # Misere chess: the checkmated side wins. 4-piece tables are included
+    # so that both sides can be checkmated.
+    "misere":   Variant("m", "mtb", "MTBPATH", True, 3, 4),
 }
 
 

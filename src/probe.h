@@ -57,6 +57,12 @@
 #define TBPATH "JTBPATH"
 #define STATSDIR "JTBSTATSDIR"
 #define LOGFILE "jtblog.txt"
+#elif defined(MISERE)
+#define WDLSUFFIX ".mtbw"
+#define DTZSUFFIX ".mtbz"
+#define TBPATH "MTBPATH"
+#define STATSDIR "MTBSTATSDIR"
+#define LOGFILE "mtblog.txt"
 #else
 #define WDLSUFFIX ".rtbw"
 #define DTZSUFFIX ".rtbz"
@@ -67,7 +73,10 @@
 
 #define MAX_TBPIECES 8
 
-#if defined(REGULAR)
+#if defined(MISERE)
+#define WDL_MAGIC 0xd839966b
+#define DTZ_MAGIC 0x027ea0f0
+#elif defined(REGULAR)
 #define WDL_MAGIC 0x5d23e871
 #define DTZ_MAGIC 0xa50c66d7
 #elif defined(ATOMIC)

@@ -28,6 +28,19 @@
 #define CAPT_WIN 1
 #define WIN_IN_ONE 2
 #define CAPT_CWIN (WIN_IN_ONE + DRAW_RULE)
+
+// In misere chess the checkmated side wins. Nobody can lose in 0 ply, so
+// there are no "win in 1" positions reached by a non-zeroing move. We can
+// therefore reuse the WIN_IN_ONE value for checkmated positions (which are
+// wins in 0 ply for the side to move). Moves into such a position are
+// losses in 1 ply (LOSS_IN_ONE).
+// Note that MATE must keep its meaning as a loss value, since the reduction
+// step maps losses within the 50-move rule to MATE.
+#ifdef MISERE
+#define MATE_VALUE WIN_IN_ONE
+#else
+#define MATE_VALUE MATE
+#endif
 #define CAPT_CWIN_RED (WIN_IN_ONE + 1)
 
 #define SET_CHANGED(x) \
@@ -216,10 +229,10 @@ static void calc_mates(struct thread_data *thread)
         p[n - 1] = i;
         if (chk_w) {
           if (table_w[idx + i] == UNKNOWN && check_mate(white_pcs, idx + i, table_b, occ | bb, p))
-            table_w[idx + i] = MATE;
+            table_w[idx + i] = MATE_VALUE;
         } else {
           if (table_b[idx + i] == UNKNOWN && check_mate(black_pcs, idx + i, table_w, occ | bb, p))
-            table_b[idx + i] = MATE;
+            table_b[idx + i] = MATE_VALUE;
         }
       }
     }
@@ -627,7 +640,12 @@ static void iterate(void)
   // ply = n -> find all wins in n, n+1 and potential losses in n, n+1
 
   ply = 0;
+#ifndef MISERE
   tbl[MATE] = 3;
+#else
+  // checkmated positions are wins in 0: mark their predecessors as changed
+  tbl[MATE_VALUE] = 2;
+#endif
   run_iter();
 
   // ply = 1
@@ -635,6 +653,10 @@ static void iterate(void)
   tbl[CHANGED] = 1;
   tbl[CAPT_WIN] = tbl[WIN_IN_ONE] = 2;
   win_loss[ILLEGAL] = 0xff;
+#ifdef MISERE
+  // a move into a checkmated position loses in 1
+  win_loss[MATE_VALUE] = LOSS_IN_ONE;
+#endif
   loss_win[LOSS_IN_ONE] = WIN_IN_ONE + 1;
   run_iter();
 
@@ -643,7 +665,9 @@ static void iterate(void)
   tbl[MATE] = 0;
   tbl[WIN_IN_ONE + 1] = 2;
   win_loss[CAPT_WIN] = LOSS_IN_ONE - 1;
+#ifndef MISERE
   win_loss[WIN_IN_ONE] = LOSS_IN_ONE - 1;
+#endif
   loss_win[LOSS_IN_ONE - 1] = WIN_IN_ONE + 2;
   run_iter();
 

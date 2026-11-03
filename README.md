@@ -23,6 +23,7 @@ the table below.
 | [Giveaway](docs/variants/giveaway.md) | `giveaway` | `gtbgen`, `gtbgenp`, `gtbver`, `gtbverp` | `.gtbw`/`.gtbz` | `GTBPATH` | Losing chess, antichess stalemate rule. |
 | [Shatranj](docs/variants/shatranj.md) | `shatranj` | `jtbgen`, `jtbgenp`, `jtbver`, `jtbverp` | `.jtbw`/`.jtbz` | `JTBPATH` | 70-move rule, bare king loses. |
 | [Racing Kings](docs/variants/racing-kings.md) | `racing` | `ktbgen`, `ktbver` | `.ktbw`/`.ktbz` | `KTBPATH` | No pawns, no color symmetry (`KRvK` and `KvKR` are separate tables). |
+| [Misère](docs/variants/misere.md) | `misere` | `mtbgen`, `mtbgenp`, `mtbver`, `mtbverp` | `.mtbw`/`.mtbz` | `MTBPATH` | Chess rules, but the checkmated side wins. |
 
 Rules, file format details, resource requirements and known limitations of
 each variant are documented in [docs/variants/](docs/variants/).
@@ -46,7 +47,8 @@ which
 
 1. generates all tables of the smallest sizes (3 pieces for chess and atomic,
    2 and 3 pieces for suicide and giveaway, 4 pieces for shatranj, where bare
-   king tables do not exist, 3 pieces for racing kings) in dependency order,
+   king tables do not exist, 3 pieces for racing kings, 3 and 4 pieces for
+   misère chess, so that both sides can be checkmated) in dependency order,
 2. verifies them with the variant's verifier, where one exists,
 3. checks the checksum embedded in every file with `tbcheck`, and
 4. compares these checksums against the reference list in

@@ -197,10 +197,20 @@ static void collect_stats_table(uint64_t *total_stats, uint8_t *table, int wtm,
       total_stats[STAT_CAPT_WIN] += stats[CAPT_WIN];
       total_stats[STAT_CAPT_CWIN] += stats[CAPT_CWIN];
       total_stats[STAT_MATE] += stats[MATE];
+#ifndef MISERE
       for (j = 0; j < DRAW_RULE; j++) {
         total_stats[1 + j] += stats[WIN_IN_ONE + j];
         total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
       }
+#else
+      // WIN_IN_ONE is used for checkmated positions, i.e. wins in 0 ply
+      total_stats[0] += stats[WIN_IN_ONE];
+      total_stats[STAT_MATE - 1] += stats[LOSS_IN_ONE];
+      for (j = 1; j < DRAW_RULE; j++) {
+        total_stats[1 + j] += stats[WIN_IN_ONE + j];
+        total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];
+      }
+#endif
       for (; j < n; j++) {
         total_stats[1 + j] += stats[WIN_IN_ONE + j + 1];
         total_stats[STAT_MATE - 1 - j] += stats[LOSS_IN_ONE - j];

@@ -1,0 +1,13 @@
+GENTBNAME = mtbgen
+GENTBPNAME = mtbgenp
+VERTBNAME = mtbver
+VERTBPNAME = mtbverp
+CLEAN = mclean
+
+DEPDIR = .depsm
+OBJDIR = objsm
+
+# Misere chess: regular chess rules, but the checkmated side wins.
+FLAGS += -DREGULAR -DMISERE
+
+include Makefile.general

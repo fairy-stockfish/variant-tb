@@ -5,12 +5,12 @@
 !checksums/*.txt
 !checksums/*/*.txt
 !tests/checksums/*.txt
-*.[rasgjlk]tb[wz]
+*.[rasgjlkm]tb[wz]
 objs*/
 .deps*/
-[rasgjlk]tbgen
-[rasgjlk]tbgenp
-[rasgjlk]tbver
-[rasgjlk]tbverp
+[rasgjlkm]tbgen
+[rasgjlkm]tbgenp
+[rasgjlkm]tbver
+[rasgjlkm]tbverp
 tbcheck
 __pycache__/
