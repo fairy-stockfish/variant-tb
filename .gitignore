@@ -2,6 +2,8 @@
 *.P
 *.swp
 *.txt
+!checksums/*.txt
+!checksums/*/*.txt
 !tests/checksums/*.txt
 *.[rasgjlk]tb[wz]
 objs*/
