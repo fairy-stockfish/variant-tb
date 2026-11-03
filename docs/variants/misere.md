@@ -20,7 +20,8 @@ differences are confined to `#ifdef MISERE` blocks in `rtbgen.c`,
 ## File format
 
 Same layout as the chess tables, with WDL magic `0xd839966b` and DTZ magic
-`0x027ea0f0`.
+`0x027ea0f0`. Reference checksums of all tables with up to 5 pieces are in
+`checksums/misere/`.
 
 * A checkmated position is stored as a win for the side to move. A move
   that checkmates the opponent is a loss with DTZ = -1.
@@ -36,8 +37,8 @@ Same layout as the chess tables, with WDL magic `0xd839966b` and DTZ magic
 ## Resources
 
 Since a player can almost always avoid checkmating the opponent, nearly all
-positions are draws: up to 4 pieces, and in the 5-piece tables tested so
-far, only the checkmate positions themselves are wins. The tables are
+positions are draws: up to 4 pieces, and in the 5-piece tables inspected
+so far, only the checkmate positions themselves are wins. The tables are
 correspondingly small (KQNvKQ: 172 KB WDL, 61 KB DTZ). With 4 threads, a
 5-piece pawnless table takes about half a minute to generate and verify, a
 5-piece pawnful table one to two and a half minutes. Memory requirements
@@ -49,8 +50,7 @@ are those of the chess generator.
   cannot be verified.
 * Because nearly all positions are drawn, the DTZ rules for longer forced
   wins and losses (including cursed results) are hardly exercised by the
-  tables tested so far (all 3- and 4-piece tables in CI, plus the 25 tables
-  needed for `KNPvKP`).
+  tables tested so far (all tables with up to 5 pieces).
 
 ## Tables and probing
 
