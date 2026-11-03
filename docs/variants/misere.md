@@ -45,7 +45,7 @@ positions, the longest win takes 100 ply and the longest cursed win 318
 ply.
 
 The tables are correspondingly small: all tables up to 5 pieces take 35 MB
-(WDL) plus 11 MB (DTZ). Generating and verifying all of them takes 42
+(WDL) plus 10 MB (DTZ). Generating and verifying all of them takes 42
 minutes with 6 threads. Memory requirements are those of the chess
 generator.
 
