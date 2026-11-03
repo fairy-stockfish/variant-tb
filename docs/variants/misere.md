@@ -56,5 +56,6 @@ generator.
 
 ## Tables and probing
 
-No generated tables are published yet. The tables are intended for
-[Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish).
+The tables up to 5 pieces are available at
+https://huggingface.co/datasets/ianfab/misere-syzygy (CC0). The tables are
+intended for [Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish).
