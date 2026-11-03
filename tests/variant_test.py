@@ -45,18 +45,16 @@ class Variant:
     min_pieces: int    # default piece range tested in CI
     max_pieces: int
     verify: bool = True        # verifier binaries exist
-    pawns: bool = True         # pawnful generator works
+    pawns: bool = True         # variant has pawns
     bare_king_tables: bool = True  # KXvK tables exist (not in shatranj)
     color_symmetry: bool = True    # KXvKY also covers KYvKX
 
 
 VARIANTS = {
     "regular":  Variant("r", "rtb", "RTBPATH", True, 3, 3),
-    # The atomic pawnful generator (atbgenp) does not currently compile,
-    # so only pawnless atomic tables are tested.
-    "atomic":   Variant("a", "atb", "ATBPATH", True, 3, 3, pawns=False),
-    "suicide":  Variant("s", "stb", "STBPATH", False, 2, 3, verify=False),
-    "giveaway": Variant("g", "gtb", "GTBPATH", False, 2, 3, verify=False),
+    "atomic":   Variant("a", "atb", "ATBPATH", True, 3, 3),
+    "suicide":  Variant("s", "stb", "STBPATH", False, 2, 3),
+    "giveaway": Variant("g", "gtb", "GTBPATH", False, 2, 3),
     # Bare king loses in shatranj, so the smallest tables have 4 pieces.
     "shatranj": Variant("j", "jtb", "JTBPATH", True, 4, 4,
                         bare_king_tables=False),

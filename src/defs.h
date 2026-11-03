@@ -45,6 +45,13 @@ enum { MAXSYMB = 4095 + 8 };
 #define SUICIDE
 #endif
 
+// smallest number of pieces in a table (suicide/giveaway have e.g. KvK)
+#ifdef SUICIDE
+#define MIN_TBPIECES 2
+#else
+#define MIN_TBPIECES 3
+#endif
+
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
 #define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)
 #else

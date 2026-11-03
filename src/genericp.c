@@ -294,7 +294,7 @@ static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int
   int pt2[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  assume(n >= 3 && n <= TBPIECES); \
+  assume(n >= MIN_TBPIECES && n <= TBPIECES); \
   assume(numpawns > 0); \
   int king, wtm; \
   uint8_t *restrict table; \
@@ -322,7 +322,7 @@ static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int
   int pt2[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  assume(n >= 3 && n <= TBPIECES); \
+  assume(n >= MIN_TBPIECES && n <= TBPIECES); \
   int king, opp_king, wtm; \
   uint8_t *restrict table; \
   int *restrict pcs; \
@@ -348,7 +348,7 @@ static void func(int k, uint8_t *restrict table, uint64_t idx, bitboard occ, int
   int p[MAX_PIECES]; \
   bitboard occ, bb; \
   int n = numpcs; \
-  assume(n >= 3 && n <= TBPIECES); \
+  assume(n >= MIN_TBPIECES && n <= TBPIECES); \
   int king; \
   uint8_t *restrict table; \
   int *restrict pcs; \
