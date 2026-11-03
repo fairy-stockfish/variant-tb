@@ -36,21 +36,23 @@ Same layout as the chess tables, with WDL magic `0xd839966b` and DTZ magic
 
 ## Resources
 
-Since a player can almost always avoid checkmating the opponent, nearly all
-positions are draws: up to 4 pieces, and in the 5-piece tables inspected
-so far, only the checkmate positions themselves are wins. The tables are
-correspondingly small (KQNvKQ: 172 KB WDL, 61 KB DTZ). With 4 threads, a
-5-piece pawnless table takes about half a minute to generate and verify, a
-5-piece pawnful table one to two and a half minutes. Memory requirements
-are those of the chess generator.
+Since a player can usually avoid checkmating the opponent, most positions
+are draws. Up to 4 pieces, and in 94 of the 110 5-piece tables, only the
+checkmate positions themselves are wins. The other 16 5-piece tables (all
+with a queen or a pawn, e.g. `KQQvKQ`, `KQBvKP`, `KRRvKQ`) contain real
+forced wins and losses: in `KQQvKQ` white to move wins 14% of the
+positions, the longest win takes 100 ply and the longest cursed win 318
+ply.
+
+The tables are correspondingly small: all tables up to 5 pieces take 35 MB
+(WDL) plus 11 MB (DTZ). Generating and verifying all of them takes 42
+minutes with 6 threads. Memory requirements are those of the chess
+generator.
 
 ## Limitations
 
 * As for chess, pawnful tables with symmetric material (e.g. `KPvKP`)
   cannot be verified.
-* Because nearly all positions are drawn, the DTZ rules for longer forced
-  wins and losses (including cursed results) are hardly exercised by the
-  tables tested so far (all tables with up to 5 pieces).
 
 ## Tables and probing
 
